@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>Spirit Radio</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app">
+      <h1>Spirit Radio</h1>
+
+      <div class="radio">
+        <div class="dial-wrapper">
+          <div id="dial" class="dial"></div>
+        </div>
+        <div class="frequency-labels">
+          <span>88</span>
+          <span>92</span>
+          <span>96</span>
+          <span>100</span>
+          <span>104</span>
+          <span>108</span>
+        </div>
+      </div>
+
+      <div class="display">
+        <div id="message">Esperando transmisión...</div>
+      </div>
+
+      <div class="controls">
+        <button id="btnToggle">Iniciar</button>
+        <label>
+          Intervalo (seg):
+          <input id="intervalInput" type="number" min="3" max="60" value="10" />
+        </label>
+      </div>
+
+      <audio id="noise" loop>
+        <source src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_8ef5b7f8b9.mp3?filename=radio-static-ambient-20731.mp3" type="audio/mpeg">
+      </audio>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
