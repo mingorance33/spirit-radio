@@ -55,7 +55,7 @@ h1 {
   transform: translateY(-50%);
   background: linear-gradient(90deg, #0ff, #0aa);
   box-shadow: 0 0 8px rgba(0, 255, 255, 0.6);
-  animation: dial-move 6s infinite alternate ease-in-out;
+  animation: dial-move 60s infinite alternate ease-in-out;
 }
 
 @keyframes dial-move {
