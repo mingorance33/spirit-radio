@@ -4,68 +4,76 @@ const msgEl = document.getElementById("message");
 const btnToggle = document.getElementById("btnToggle");
 const staticNoise = document.getElementById("staticNoise");
 const radioBank = document.getElementById("radioBank");
+const dialEl = document.getElementById("dial");
 
 let radioTimerId = null;
 let paranormalTimerId = null;
-
-// --- Configuración de Frases y Voz ---
 let phrases = [];
 
-// Cargar las frases del JSON al iniciar
+// 1. Cargar frases desde el JSON
 fetch('phrases.json')
   .then(response => response.json())
   .then(data => {
     phrases = data.phrases;
-  });
+  })
+  .catch(err => console.error("Error cargando frases:", err));
 
+// 2. Función de voz de ultratumba
 function speakTetric(text) {
-  if (!text) return;
-
-  // Mostrar el texto en pantalla (opcional, puedes comentarlo si prefieres secreto)
-  if (msgEl) msgEl.textContent = text;
+  if (!text || !window.speechSynthesis) return;
 
   const utterance = new SpeechSynthesisUtterance(text);
   
-  // Configuración para voz "tétrica"
+  // Configuración tétrica: muy grave y muy lento
   utterance.lang = 'es-ES'; 
-  utterance.pitch = 0.1;  // Muy grave
-  utterance.rate = 0.6;   // Muy lento
-  utterance.volume = 1;
+  utterance.pitch = 0.1;  // Tono cavernoso
+  utterance.rate = 0.5;   // Velocidad arrastrada
+  utterance.volume = 1.0;
 
-  // Intentar seleccionar una voz masculina si está disponible (suelen sonar más roncas al bajar el pitch)
+  // Buscar una voz masculina si está disponible para mayor profundidad
   const voices = window.speechSynthesis.getVoices();
-  const maleVoice = voices.find(voice => voice.lang.includes('es') && voice.name.toLowerCase().includes('google'));
+  const maleVoice = voices.find(v => v.lang.includes('es') && (v.name.includes('Male') || v.name.includes('Google')));
   if (maleVoice) utterance.voice = maleVoice;
+
+  // Evento al empezar a hablar
+  utterance.onstart = () => {
+    if (msgEl) msgEl.textContent = text;
+    if (dialEl) dialEl.style.boxShadow = "0 0 20px #ff0000"; // Dial rojo
+    staticNoise.volume = 0.05; // Atenuar ruido para que se entienda la voz
+    
+    // Vibración tétrica (patrón de pulso largo)
+    if ("vibrate" in navigator) {
+      navigator.vibrate([200, 100, 200]);
+    }
+  };
+
+  // Evento al terminar
+  utterance.onend = () => {
+    if (dialEl) dialEl.style.boxShadow = "0 0 8px rgba(0, 255, 255, 0.6)";
+    staticNoise.volume = 0.15; // Restaurar ruido ambiente
+  };
 
   window.speechSynthesis.speak(utterance);
 }
 
-// Reproduce una frase aleatoria
+// 3. Reproducir frase aleatoria del JSON
 function playRandomParanormalClip() {
   if (phrases.length === 0) return;
   const idx = Math.floor(Math.random() * phrases.length);
   speakTetric(phrases[idx]);
 }
 
-// --- El resto de tus funciones se mantienen igual ---
-
+// 4. Lógica de radio (trozos de radio.mp3)
 function playRandomRadioSlice() {
   if (!radioBank.duration || Number.isNaN(radioBank.duration)) return;
 
   const total = radioBank.duration;
   const sliceLength = 2; 
-
-  if (total <= sliceLength) {
-    radioBank.currentTime = 0;
-    radioBank.play().catch(() => {});
-    return;
-  }
-
   const start = Math.random() * (total - sliceLength);
   const end = start + sliceLength;
 
   radioBank.currentTime = start;
-  radioBank.volume = 0.25; // Bajamos un poco para que se oiga la voz
+  radioBank.volume = 0.25; 
   radioBank.play().catch(() => {});
 
   const stopTimer = setInterval(() => {
@@ -87,14 +95,15 @@ function scheduleParanormals(intervalSec) {
   }, intervalSec * 1000);
 }
 
+// 5. Controles de inicio/parada
 function startRadio() {
   if (running) return;
   running = true;
   btnToggle.textContent = "Detener";
 
-  const intervalSec = 20; // Bajamos a 20s para que sea más dinámico
+  const intervalSec = 25; // Tiempo entre psicofonías
 
-  staticNoise.volume = 0.1;
+  staticNoise.volume = 0.15;
   staticNoise.play().catch(() => {});
 
   transmitRadio();
@@ -105,18 +114,20 @@ function startRadio() {
 function stopRadio() {
   running = false;
   btnToggle.textContent = "Iniciar";
+
   if (radioTimerId) clearInterval(radioTimerId);
   if (paranormalTimerId) clearInterval(paranormalTimerId);
+
   staticNoise.pause();
   radioBank.pause();
-  window.speechSynthesis.cancel(); // Detener el habla si está activa
+  window.speechSynthesis.cancel(); // Silenciar voz inmediatamente
 }
 
+// Interacción inicial necesaria para navegadores móviles
 btnToggle.addEventListener("click", () => {
-  // En móviles es CRUCIAL que el primer sonido ocurra dentro de un click
-  // Despertamos el motor de síntesis
-  const vaceo = new SpeechSynthesisUtterance("");
-  window.speechSynthesis.speak(vaceo);
+  // Desbloqueamos el motor de síntesis con un mensaje vacío
+  const unlockSpeech = new SpeechSynthesisUtterance("");
+  window.speechSynthesis.speak(unlockSpeech);
 
   if (running) {
     stopRadio();
