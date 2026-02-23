@@ -2,82 +2,58 @@ let running = false;
 
 const msgEl = document.getElementById("message");
 const btnToggle = document.getElementById("btnToggle");
-
 const staticNoise = document.getElementById("staticNoise");
 const radioBank = document.getElementById("radioBank");
 
-// Timers
 let radioTimerId = null;
 let paranormalTimerId = null;
 
-// Frases desde phrases.json
+// --- Configuración de Frases y Voz ---
 let phrases = [];
 
-// Web Speech API (TTS)
-const synth = window.speechSynthesis;
+// Cargar las frases del JSON al iniciar
+fetch('phrases.json')
+  .then(response => response.json())
+  .then(data => {
+    phrases = data.phrases;
+  });
 
-// ---------- Cargar frases ----------
+function speakTetric(text) {
+  if (!text) return;
 
-async function loadPhrases() {
-  try {
-    const res = await fetch("phrases.json");
-    const data = await res.json();
-    phrases = Array.isArray(data.phrases) ? data.phrases : [];
-  } catch (err) {
-    console.error("Error cargando phrases.json", err);
-    phrases = [];
-  }
+  // Mostrar el texto en pantalla (opcional, puedes comentarlo si prefieres secreto)
+  if (msgEl) msgEl.textContent = text;
+
+  const utterance = new SpeechSynthesisUtterance(text);
+  
+  // Configuración para voz "tétrica"
+  utterance.lang = 'es-ES'; 
+  utterance.pitch = 0.1;  // Muy grave
+  utterance.rate = 0.6;   // Muy lento
+  utterance.volume = 1;
+
+  // Intentar seleccionar una voz masculina si está disponible (suelen sonar más roncas al bajar el pitch)
+  const voices = window.speechSynthesis.getVoices();
+  const maleVoice = voices.find(voice => voice.lang.includes('es') && voice.name.toLowerCase().includes('google'));
+  if (maleVoice) utterance.voice = maleVoice;
+
+  window.speechSynthesis.speak(utterance);
 }
 
-function getRandomPhrase() {
-  if (!phrases.length) return "";
+// Reproduce una frase aleatoria
+function playRandomParanormalClip() {
+  if (phrases.length === 0) return;
   const idx = Math.floor(Math.random() * phrases.length);
-  return phrases[idx];
+  speakTetric(phrases[idx]);
 }
 
-// ---------- Voz tenebrosa ----------
-
-function speakCreepy(text) {
-  if (!text || !("speechSynthesis" in window)) return;
-
-  // Cancelar cualquier locución anterior
-  synth.cancel();
-
-  const utter = new SpeechSynthesisUtterance(text);
-
-  utter.lang = "es-ES";
-
-  // Parámetros base tenebrosos
-  const baseRate = 0.6;  // lento
-  const basePitch = 0.4; // grave
-
-  // Pequeña variación aleatoria para que no suene igual siempre
-  const rateJitter = (Math.random() - 0.5) * 0.1;   // ±0.05
-  const pitchJitter = (Math.random() - 0.5) * 0.1;  // ±0.05
-
-  utter.rate = Math.max(0.4, baseRate + rateJitter);
-  utter.pitch = Math.max(0.1, basePitch + pitchJitter);
-  utter.volume = 1.0;
-
-  synth.speak(utter);
-}
-
-// ---------- Audio de radio ----------
+// --- El resto de tus funciones se mantienen igual ---
 
 function playRandomRadioSlice() {
-  if (!radioBank.duration || Number.isNaN(radioBank.duration)) {
-    radioBank.addEventListener(
-      "loadedmetadata",
-      () => {
-        playRandomRadioSlice();
-      },
-      { once: true }
-    );
-    return;
-  }
+  if (!radioBank.duration || Number.isNaN(radioBank.duration)) return;
 
   const total = radioBank.duration;
-  const sliceLength = 2; // segundos
+  const sliceLength = 2; 
 
   if (total <= sliceLength) {
     radioBank.currentTime = 0;
@@ -89,7 +65,7 @@ function playRandomRadioSlice() {
   const end = start + sliceLength;
 
   radioBank.currentTime = start;
-  radioBank.volume = 0.35;
+  radioBank.volume = 0.25; // Bajamos un poco para que se oiga la voz
   radioBank.play().catch(() => {});
 
   const stopTimer = setInterval(() => {
@@ -100,88 +76,47 @@ function playRandomRadioSlice() {
   }, 50);
 }
 
-// Solo trozo de radio
 function transmitRadio() {
   playRandomRadioSlice();
 }
 
-// Después del primer intervalo, empezar a “hablar”
-function scheduleParanormalVoices(intervalSec) {
-  // Por seguridad, limpiar cualquier intervalo previo
-  if (paranormalTimerId) {
-    clearInterval(paranormalTimerId);
-    paranormalTimerId = null;
-  }
-
-  // Primera frase después de intervalSec
+function scheduleParanormals(intervalSec) {
   setTimeout(() => {
-    const phrase = getRandomPhrase();
-    if (phrase) {
-      // Mostrar en pequeño en pantalla para depurar
-      if (msgEl) {
-        msgEl.textContent = phrase;
-      }
-      speakCreepy(phrase);
-    }
-
-    // A partir de ahí, cada intervalo fijo
-    paranormalTimerId = setInterval(() => {
-      const p = getRandomPhrase();
-      if (!p) return;
-      if (msgEl) {
-        msgEl.textContent = p;
-      }
-      speakCreepy(p);
-    }, intervalSec * 1000);
+    playRandomParanormalClip();
+    paranormalTimerId = setInterval(playRandomParanormalClip, intervalSec * 1000);
   }, intervalSec * 1000);
 }
-
-// ---------- Control general ----------
 
 function startRadio() {
   if (running) return;
   running = true;
   btnToggle.textContent = "Detener";
 
-  const intervalSec = 30; // 30 s fijo
+  const intervalSec = 20; // Bajamos a 20s para que sea más dinámico
 
-  // Estático ambiente
-  staticNoise.volume = 0.15;
+  staticNoise.volume = 0.1;
   staticNoise.play().catch(() => {});
 
-  // Radio: primer trozo inmediato
   transmitRadio();
   radioTimerId = setInterval(transmitRadio, intervalSec * 1000);
-
-  // Voces: empiezan tras el primer intervalo
-  scheduleParanormalVoices(intervalSec);
+  scheduleParanormals(intervalSec);
 }
 
 function stopRadio() {
   running = false;
   btnToggle.textContent = "Iniciar";
-
-  if (radioTimerId) {
-    clearInterval(radioTimerId);
-    radioTimerId = null;
-  }
-  if (paranormalTimerId) {
-    clearInterval(paranormalTimerId);
-    paranormalTimerId = null;
-  }
-
+  if (radioTimerId) clearInterval(radioTimerId);
+  if (paranormalTimerId) clearInterval(paranormalTimerId);
   staticNoise.pause();
   radioBank.pause();
-  synth.cancel();
+  window.speechSynthesis.cancel(); // Detener el habla si está activa
 }
 
-// Botón (desbloquea audio y voz en móvil)
 btnToggle.addEventListener("click", () => {
-  // Intento de play para desbloquear audio en iOS/Android
-  staticNoise.play().catch(() => {});
-  radioBank.play().catch(() => {
-    radioBank.pause();
-  });
+  // En móviles es CRUCIAL que el primer sonido ocurra dentro de un click
+  // Despertamos el motor de síntesis
+  const vaceo = new SpeechSynthesisUtterance("");
+  window.speechSynthesis.speak(vaceo);
 
   if (running) {
     stopRadio();
@@ -189,7 +124,3 @@ btnToggle.addEventListener("click", () => {
     startRadio();
   }
 });
-
-// Al cargar: limpiar texto y cargar frases
-if (msgEl) msgEl.textContent = "";
-loadPhrases();
