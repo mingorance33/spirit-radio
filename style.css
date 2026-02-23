@@ -130,3 +130,16 @@ button:hover {
 .paused-anim {
   animation-play-state: paused !important;
 }
+
+#message {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 1.5rem;
+  color: #0ff;
+  text-shadow: 0 0 10px #0ff;
+  letter-spacing: 2px;
+  font-weight: bold;
+}
+
+.paused-anim {
+  animation-play-state: paused !important;
+}
