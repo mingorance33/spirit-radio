@@ -18,16 +18,18 @@ fetch('phrases.json')
   })
   .catch(err => console.error("Error cargando frases:", err));
 
-// 2. Función de voz de ultratumba (Mejorada para detenerse)
+// Inicializar el dial pausado al cargar la página
+window.addEventListener('load', () => {
+  if (dialEl) dialEl.classList.add('paused-anim');
+});
+
+// 2. Función de voz de ultratumba
 function speakTetric(text) {
-  // Si la app se detuvo mientras se procesaba la función, abortamos
   if (!running || !text || !window.speechSynthesis) return;
 
-  // Cancelar cualquier voz previa para evitar colas infinitas
   window.speechSynthesis.cancel();
 
   const utterance = new SpeechSynthesisUtterance(text);
-  
   utterance.lang = 'es-ES'; 
   utterance.pitch = 0.1;  
   utterance.rate = 0.5;   
@@ -38,7 +40,7 @@ function speakTetric(text) {
   if (maleVoice) utterance.voice = maleVoice;
 
   utterance.onstart = () => {
-    if (!running) { // Verificación de seguridad de último segundo
+    if (!running) {
         window.speechSynthesis.cancel();
         return;
     }
@@ -80,25 +82,26 @@ function playRandomRadioSlice() {
   }, 50);
 }
 
-// 4. Controles principales (Blindados)
+// 4. Controles principales
 function startRadio() {
   if (running) return;
   running = true;
   btnToggle.textContent = "Detener";
+
+  // ACTIVAR ESCANEO (Quitar pausa de animación)
+  if (dialEl) dialEl.classList.remove('paused-anim');
 
   const intervalSec = 25; 
 
   staticNoise.volume = 0.15;
   staticNoise.play().catch(() => {});
 
-  // Ejecución inmediata
   playRandomRadioSlice();
   
   radioTimerId = setInterval(() => {
       if(running) playRandomRadioSlice();
   }, intervalSec * 1000);
 
-  // Programar voces
   paranormalTimerId = setInterval(() => {
       if(running && phrases.length > 0) {
           const idx = Math.floor(Math.random() * phrases.length);
@@ -111,18 +114,18 @@ function stopRadio() {
   running = false;
   btnToggle.textContent = "Iniciar";
 
-  // Limpiar todos los intervalos inmediatamente
+  // PAUSAR ESCANEO (Añadir clase de pausa)
+  if (dialEl) dialEl.classList.add('paused-anim');
+
   clearInterval(radioTimerId);
   clearInterval(paranormalTimerId);
   radioTimerId = null;
   paranormalTimerId = null;
 
-  // Detener todos los audios
   staticNoise.pause();
   staticNoise.currentTime = 0;
   radioBank.pause();
   
-  // ¡IMPORTANTE! Cancelar la voz de raíz
   window.speechSynthesis.cancel();
 
   if (msgEl) msgEl.textContent = "";
@@ -130,7 +133,6 @@ function stopRadio() {
 }
 
 btnToggle.addEventListener("click", () => {
-  // Truco para iOS: siempre intentar hablar algo vacío para ganar permiso
   const unlock = new SpeechSynthesisUtterance("");
   window.speechSynthesis.speak(unlock);
 
