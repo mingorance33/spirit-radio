@@ -38,55 +38,44 @@ h1 {
   border: 1px solid #222;
 }
 
-/* Layout general del bloque de radio */
-.radio-layout {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-/* Contenedor vertical del dial */
-.dial-wrapper-vertical {
+/* Dial horizontal como “ventana” */
+.dial-wrapper {
   position: relative;
-  width: 26px;
-  height: 160px;
-  border-radius: 999px;
+  height: 40px;
+  border-radius: 10px;
   background: radial-gradient(circle at 50% 50%, #222 0, #050505 70%);
   overflow: hidden;
 }
 
-/* Línea que sube y baja lentamente (1 min de abajo a arriba) */
-.dial-line-vertical {
+/* Barra fina vertical que se desplaza horizontalmente */
+.dial-line {
   position: absolute;
-  left: 50%;
-  bottom: 0;
-  width: 2px;
-  height: 60px;               /* largo de la “aguja” */
-  transform: translateX(-50%);
+  top: 4px;
+  bottom: 4px;        /* ocupa casi toda la altura */
+  left: 0;
+  width: 3px;         /* fina y vertical */
   background: linear-gradient(#0ff, #0aa);
   box-shadow: 0 0 8px rgba(0, 255, 255, 0.6);
-  animation: dial-move-vertical 60s infinite alternate ease-in-out;
+  animation: dial-move 60s infinite alternate ease-in-out;
 }
 
-/* De abajo (0%) a arriba (100%) en 60s */
-@keyframes dial-move-vertical {
+/* Se mueve de izquierda a derecha en 60s (1 min) */
+@keyframes dial-move {
   0% {
-    bottom: 0%;
+    left: 0%;
   }
   100% {
-    bottom: calc(100% - 60px);
+    left: calc(100% - 3px);
   }
 }
 
-/* Frecuencias en columna, al lado del dial */
-.frequency-labels-vertical {
+/* Frecuencias bajo el dial */
+.frequency-labels {
   display: flex;
-  flex-direction: column;
   justify-content: space-between;
-  height: 160px;
   font-size: 0.7rem;
   opacity: 0.8;
+  margin-top: 0.35rem;
 }
 
 .display {
