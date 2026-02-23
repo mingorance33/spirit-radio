@@ -78,12 +78,18 @@ function stopRadio() {
 
 // Evento botón
 btnToggle.addEventListener("click", () => {
+  // Primer toque: desbloquea audio y voz en iOS
+  noise.play().catch(() => {});
+  speakPhrase("Audio activado"); // frase corta solo para activar
+  synth.cancel();
+
   if (running) {
     stopRadio();
   } else {
     startRadio();
   }
 });
+
 
 // Cargar frases al inicio
 loadPhrases();
