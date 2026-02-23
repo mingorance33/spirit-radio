@@ -78,16 +78,6 @@ h1 {
   margin-top: 0.35rem;
 }
 
-/* Lectura numérica central con 3 decimales */
-.frequency-readout {
-  margin-top: 0.3rem;
-  text-align: center;
-  font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas,
-    "Liberation Mono", "Courier New", monospace;
-  font-size: 0.8rem;
-  opacity: 0.9;
-}
-
 .display {
   margin-top: 1rem;
   padding: 0.8rem 1rem;
