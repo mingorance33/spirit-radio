@@ -1,139 +1,109 @@
-* {
-  box-sizing: border-box;
-}
+let phrases = [];
+let timerId = null;
+let running = false;
 
-body {
-  margin: 0;
-  font-family: system-ui, -apple-system, sans-serif;
-  background: radial-gradient(#050509, #000);
-  color: #f5f5f5;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-}
+const msgEl = document.getElementById("message");
+const btnToggle = document.getElementById("btnToggle");
+const intervalInput = document.getElementById("intervalInput");
+const noise = document.getElementById("noise");
 
-.app {
-  width: 100%;
-  max-width: 500px;
-  padding: 1.5rem;
-  background: rgba(10, 10, 20, 0.9);
-  border-radius: 12px;
-  box-shadow: 0 0 25px rgba(0, 255, 255, 0.25);
-}
+const synth = window.speechSynthesis;
 
-h1 {
-  text-align: center;
-  margin-top: 0;
-  margin-bottom: 1.5rem;
-  letter-spacing: 0.15em;
-  font-size: 1.1rem;
-  text-transform: uppercase;
-}
-
-.radio {
-  background: #111;
-  border-radius: 10px;
-  padding: 1rem;
-  border: 1px solid #222;
-}
-
-.dial-wrapper {
-  position: relative;
-  height: 30px;
-  border-radius: 6px;
-  background: radial-gradient(circle at 50% 50%, #222 0, #050505 70%);
-  overflow: hidden;
-}
-
-/* Línea fina que recorre el dial lentamente */
-.dial-line {
-  position: absolute;
-  top: 50%;
-  left: 0;
-  width: 70px;      /* ancho de la “aguja” */
-  height: 2px;      /* casi una línea */
-  transform: translateY(-50%);
-  background: linear-gradient(90deg, #0ff, #0aa);
-  box-shadow: 0 0 8px rgba(0, 255, 255, 0.6);
-  animation: dial-move 6s infinite alternate ease-in-out;
-}
-
-/* Movimiento izquierda ↔ derecha más lento */
-@keyframes dial-move {
-  0% {
-    left: 0%;
-  }
-  100% {
-    left: calc(100% - 70px);
+// Cargar frases desde el JSON
+async function loadPhrases() {
+  try {
+    const res = await fetch("phrases.json");
+    const data = await res.json();
+    phrases = Array.isArray(data.phrases) ? data.phrases : [];
+  } catch (err) {
+    console.error(err);
+    phrases = [];
   }
 }
 
-.frequency-labels {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.7rem;
-  opacity: 0.8;
-  margin-top: 0.35rem;
+// Devuelve una frase aleatoria
+function getRandomPhrase() {
+  if (!phrases.length) return "";
+  const idx = Math.floor(Math.random() * phrases.length);
+  return phrases[idx];
 }
 
-.display {
-  margin-top: 1rem;
-  padding: 0.8rem 1rem;
-  min-height: 60px;
-  border-radius: 8px;
-  border: 1px solid #333;
-  background: linear-gradient(135deg, rgba(0, 0, 0, 0.8), rgba(20, 20, 40, 0.95));
-  display: flex;
-  align-items: center;
-  justify-content: center;
+// Hablar una frase con voz sintética
+function speakPhrase(text) {
+  if (!("speechSynthesis" in window)) {
+    return;
+  }
+
+  // Cancelar lo anterior para que no se encadenen
+  synth.cancel();
+
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = "es-ES";
+  utter.rate = 0.9;   // un poco más lento
+  utter.pitch = 1.0;
+  utter.volume = 1.0;
+
+  synth.speak(utter);
 }
 
-#message {
-  text-align: center;
-  font-size: 1rem;
-  line-height: 1.4;
-  white-space: pre-wrap;
+// Muestra una “transmisión” y la habla
+function transmit() {
+  const phrase = getRandomPhrase();
+  if (!phrase) {
+    msgEl.textContent = "Sin datos en phrases.json";
+    return;
+  }
+
+  msgEl.textContent = "";
+
+  let i = 0;
+  const chars = phrase.split("");
+  const typeInterval = setInterval(() => {
+    msgEl.textContent += chars[i];
+    i++;
+    if (i >= chars.length) {
+      clearInterval(typeInterval);
+      // Cuando termina de “escribirse”, la habla
+      speakPhrase(phrase);
+    }
+  }, 80);
 }
 
-.controls {
-  margin-top: 1rem;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  align-items: center;
-  justify-content: center;
+// Arrancar / parar radio
+function startRadio() {
+  if (running) return;
+  running = true;
+  btnToggle.textContent = "Detener";
+
+  const intervalSec = Math.max(3, Number(intervalInput.value) || 10);
+  transmit(); // primera frase inmediata
+  timerId = setInterval(transmit, intervalSec * 1000);
+
+  // Ruido de fondo
+  noise.volume = 0.4;
+  noise.play().catch(() => {});
 }
 
-button {
-  padding: 0.5rem 1.2rem;
-  border-radius: 999px;
-  border: none;
-  cursor: pointer;
-  background: #0ff;
-  color: #000;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 0.75rem;
+function stopRadio() {
+  running = false;
+  btnToggle.textContent = "Iniciar";
+  if (timerId) {
+    clearInterval(timerId);
+    timerId = null;
+  }
+  msgEl.textContent = "Esperando transmisión...";
+  noise.pause();
+  synth.cancel();
 }
 
-button:hover {
-  filter: brightness(1.1);
-}
+// Evento botón
+btnToggle.addEventListener("click", () => {
+  if (running) {
+    stopRadio();
+  } else {
+    startRadio();
+  }
+});
 
-label {
-  font-size: 0.75rem;
-  display: flex;
-  gap: 0.3rem;
-  align-items: center;
-}
-
-input[type="number"] {
-  width: 60px;
-  padding: 0.2rem 0.4rem;
-  border-radius: 6px;
-  border: 1px solid #444;
-  background: #111;
-  color: #eee;
-}
+// Cargar frases al inicio
+loadPhrases();
