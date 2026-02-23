@@ -107,14 +107,30 @@ function transmitRadio() {
 
 // Después del primer intervalo, empezar a “hablar”
 function scheduleParanormalVoices(intervalSec) {
-  setTimeout(() => {
-    // Primera vez
-    const phrase = getRandomPhrase();
-    speakCreepy(phrase);
+  // Por seguridad, limpiar cualquier intervalo previo
+  if (paranormalTimerId) {
+    clearInterval(paranormalTimerId);
+    paranormalTimerId = null;
+  }
 
-    // Luego cada intervalo
+  // Primera frase después de intervalSec
+  setTimeout(() => {
+    const phrase = getRandomPhrase();
+    if (phrase) {
+      // Mostrar en pequeño en pantalla para depurar
+      if (msgEl) {
+        msgEl.textContent = phrase;
+      }
+      speakCreepy(phrase);
+    }
+
+    // A partir de ahí, cada intervalo fijo
     paranormalTimerId = setInterval(() => {
       const p = getRandomPhrase();
+      if (!p) return;
+      if (msgEl) {
+        msgEl.textContent = p;
+      }
       speakCreepy(p);
     }, intervalSec * 1000);
   }, intervalSec * 1000);
