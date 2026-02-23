@@ -7,6 +7,8 @@ const btnToggle = document.getElementById("btnToggle");
 const intervalInput = document.getElementById("intervalInput");
 const noise = document.getElementById("noise");
 
+const synth = window.speechSynthesis;
+
 // Cargar frases desde el JSON
 async function loadPhrases() {
   try {
@@ -26,7 +28,19 @@ function getRandomPhrase() {
   return phrases[idx];
 }
 
-// Muestra una “transmisión”
+// Hablar una frase con voz sintética
+function speakPhrase(text) {
+  if (!("speechSynthesis" in window)) return;
+  synth.cancel();
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = "es-ES";
+  utter.rate = 0.9;
+  utter.pitch = 1.0;
+  utter.volume = 1.0;
+  synth.speak(utter);
+}
+
+// Muestra una transmisión y la habla
 function transmit() {
   const phrase = getRandomPhrase();
   if (!phrase) {
@@ -35,8 +49,6 @@ function transmit() {
   }
 
   msgEl.textContent = "";
-
-  // Simulamos que “se forma” la frase carácter a carácter
   let i = 0;
   const chars = phrase.split("");
   const typeInterval = setInterval(() => {
@@ -44,6 +56,7 @@ function transmit() {
     i++;
     if (i >= chars.length) {
       clearInterval(typeInterval);
+      speakPhrase(phrase);
     }
   }, 80);
 }
@@ -55,14 +68,11 @@ function startRadio() {
   btnToggle.textContent = "Detener";
 
   const intervalSec = Math.max(3, Number(intervalInput.value) || 10);
-  transmit(); // primera frase inmediata
+  transmit();
   timerId = setInterval(transmit, intervalSec * 1000);
 
-  // Intentar reproducir ruido
   noise.volume = 0.4;
-  noise.play().catch(() => {
-    // Algunos navegadores bloquean el autoplay hasta interacción
-  });
+  noise.play().catch(() => {});
 }
 
 function stopRadio() {
@@ -74,13 +84,13 @@ function stopRadio() {
   }
   msgEl.textContent = "Esperando transmisión...";
   noise.pause();
+  synth.cancel();
 }
 
-// Evento botón
+// Botón (activa audio/voz en móviles)
 btnToggle.addEventListener("click", () => {
-  // Primer toque: desbloquea audio y voz en iOS
   noise.play().catch(() => {});
-  speakPhrase("Audio activado"); // frase corta solo para activar
+  speakPhrase(" "); // pequeño truco para activar voces
   synth.cancel();
 
   if (running) {
@@ -89,7 +99,6 @@ btnToggle.addEventListener("click", () => {
     startRadio();
   }
 });
-
 
 // Cargar frases al inicio
 loadPhrases();
