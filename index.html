@@ -25,7 +25,8 @@
       </div>
 
       <div class="display">
-        <div id="message">Esperando transmisión...</div>
+        <!-- Lo dejamos vacío, no mostramos texto -->
+        <div id="message"></div>
       </div>
 
       <div class="controls">
@@ -36,8 +37,14 @@
         </label>
       </div>
 
-      <audio id="noise" loop>
-        <source src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_8ef5b7f8b9.mp3?filename=radio-static-ambient-20731.mp3" type="audio/mpeg">
+      <!-- Ruido estático ambiente -->
+      <audio id="staticNoise" loop>
+        <source src="static.mp3" type="audio/mpeg" />
+      </audio>
+
+      <!-- Banco de radio que sonará a trozos aleatorios -->
+      <audio id="radioBank">
+        <source src="radio.mp3" type="audio/mpeg" />
       </audio>
     </div>
 
