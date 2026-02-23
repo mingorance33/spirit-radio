@@ -9,42 +9,56 @@ const dialWrapper = document.querySelector(".dial-wrapper");
 
 let radioTimerId = null;
 let paranormalTimerId = null;
-let displayUpdateId = null; // Nuevo timer para los kHz constantes
+let displayUpdateId = null;
 let phrases = [];
 
-// Cargar frases
+// Cargar frases del JSON
 fetch('phrases.json')
   .then(response => response.json())
   .then(data => phrases = data.phrases)
   .catch(err => console.error("Error frases:", err));
 
-// --- LÓGICA DEL DIAL EN TIEMPO REAL ---
-
+// --- 1. LÓGICA DEL DIAL (kHz SIEMPRE ACTIVOS) ---
 function updateFrequencyDisplay() {
-  if (!dialEl || !dialWrapper) return;
+  if (!dialEl || !dialWrapper || !running) return;
 
-  // Obtenemos la posición actual de la línea del dial respecto al contenedor
   const dialRect = dialEl.getBoundingClientRect();
   const wrapperRect = dialWrapper.getBoundingClientRect();
 
-  // Calculamos el porcentaje de avance (0 a 1)
   const offset = dialRect.left - wrapperRect.left;
   const width = wrapperRect.width - dialRect.width;
   let percent = offset / width;
 
-  // Limitar entre 0 y 1 por seguridad
   percent = Math.max(0, Math.min(1, percent));
 
-  // Mapear el porcentaje al rango 153.000 - 281.000
-  const minFreq = 153;
-  const maxFreq = 281;
+  const minFreq = 153.000;
+  const maxFreq = 281.000;
   const currentFreq = (minFreq + (percent * (maxFreq - minFreq))).toFixed(3);
 
   msgEl.textContent = `${currentFreq} kHz`;
 }
 
-// --- SÍNTESIS DE VOZ TÉTRICA ---
+// --- 2. LÓGICA DE RADIO (FRAGMENTOS DE 2 SEG) ---
+function playRandomRadioSlice() {
+  if (!running || !radioBank.duration) return;
 
+  // Elegir un punto aleatorio asegurando que queden al menos 2 seg de audio
+  const sliceLength = 2; 
+  const startTime = Math.random() * (radioBank.duration - sliceLength);
+  
+  radioBank.currentTime = startTime;
+  radioBank.volume = 0.3; // Volumen de la "emisora" captada
+  
+  // Reproducir
+  radioBank.play().catch(e => console.log("Error play radio:", e));
+
+  // Forzar la parada exactamente 2 segundos después
+  setTimeout(() => {
+    radioBank.pause();
+  }, sliceLength * 1000);
+}
+
+// --- 3. SÍNTESIS DE VOZ TÉTRICA ---
 function speakTetric(text) {
   if (!running || !text || !window.speechSynthesis) return;
 
@@ -58,51 +72,42 @@ function speakTetric(text) {
 
   utterance.onstart = () => {
     if (!running) { window.speechSynthesis.cancel(); return; }
-    msgEl.classList.add('evp-active'); // Poner números en rojo
-    staticNoise.volume = 0.05;
+    msgEl.classList.add('evp-active');
+    staticNoise.volume = 0.05; // Baja el estático mientras habla
     if ("vibrate" in navigator) navigator.vibrate([200, 100, 200]);
   };
 
   utterance.onend = () => {
-    msgEl.classList.remove('evp-active'); // Volver a cian
+    msgEl.classList.remove('evp-active');
     if (running) staticNoise.volume = 0.15;
   };
 
   window.speechSynthesis.speak(utterance);
 }
 
-// --- LÓGICA DE AUDIO ---
-
-function playRandomRadioSlice() {
-  if (!running || !radioBank.duration) return;
-  const start = Math.random() * (radioBank.duration - 2);
-  radioBank.currentTime = start;
-  radioBank.volume = 0.25;
-  radioBank.play().catch(() => {});
-  setTimeout(() => { if (!running) radioBank.pause(); }, 2000);
-}
-
-// --- CONTROL DE INICIO / PARADA ---
-
+// --- 4. CONTROLES ---
 function startRadio() {
   if (running) return;
   running = true;
   btnToggle.textContent = "Detener";
-
-  // Iniciar movimiento visual
   dialEl.classList.remove('paused-anim');
 
-  // 1. Actualización constante de kHz (independiente de todo)
+  // Actualizar kHz constantemente
   displayUpdateId = setInterval(updateFrequencyDisplay, 50);
 
-  // 2. Ruido de fondo
+  // Ruido estático constante de fondo
   staticNoise.volume = 0.15;
   staticNoise.play().catch(() => {});
 
-  // 3. Intervalos de Radio y Voces
+  // Ejecutar primer fragmento de radio inmediatamente
   playRandomRadioSlice();
-  radioTimerId = setInterval(playRandomRadioSlice, 20000);
+  
+  // Programar fragmentos de radio cada 15 segundos
+  radioTimerId = setInterval(() => {
+    if (running) playRandomRadioSlice();
+  }, 15000);
 
+  // Programar frases tétricas cada 25 segundos
   paranormalTimerId = setInterval(() => {
     if (running && phrases.length > 0) {
       const idx = Math.floor(Math.random() * phrases.length);
@@ -114,31 +119,28 @@ function startRadio() {
 function stopRadio() {
   running = false;
   btnToggle.textContent = "Iniciar";
-
-  // Pausar visuales
   dialEl.classList.add('paused-anim');
   
-  // Limpiar todos los procesos
   clearInterval(displayUpdateId);
   clearInterval(radioTimerId);
   clearInterval(paranormalTimerId);
   
   staticNoise.pause();
-  radioBank.pause();
+  radioBank.pause(); // Detiene el fragmento de radio si estaba sonando
   window.speechSynthesis.cancel();
 
   msgEl.classList.remove('evp-active');
-  // No borramos el número para que se quede "congelado" donde paró
 }
 
 btnToggle.addEventListener("click", () => {
+  // Desbloqueo de audio para móviles
   const unlock = new SpeechSynthesisUtterance("");
   window.speechSynthesis.speak(unlock);
+  
   if (running) stopRadio(); else startRadio();
 });
 
-// Inicializar pausado
 window.addEventListener('load', () => {
   dialEl.classList.add('paused-anim');
-  updateFrequencyDisplay(); // Mostrar frecuencia inicial
+  msgEl.textContent = "153.000 kHz";
 });
