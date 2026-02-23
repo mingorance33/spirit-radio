@@ -126,3 +126,7 @@ button {
 button:hover {
   filter: brightness(1.1);
 }
+/* Clase para pausar la animación del dial */
+.paused-anim {
+  animation-play-state: paused !important;
+}
