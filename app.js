@@ -11,30 +11,49 @@ let radioTimerId = null;
 // Timer para clips paranormales (después del primer intervalo)
 let paranormalTimerId = null;
 
-// Clips paranormales: 1.mp3, 2.mp3, 3.mp3...
-const paranormalClips = [
+// ------- Clips paranormales: 1.mp3, 2.mp3, 3.mp3... -------
+
+// Rutas de los clips
+const paranormalClipSources = [
   "1.mp3",
   "2.mp3",
   "3.mp3"
   // añade más: "4.mp3", "5.mp3", ...
 ];
 
+// Objetos Audio reutilizables (para móviles)
+let paranormalAudios = [];
+let paranormalsInitialized = false;
+
+function initParanormalAudios() {
+  if (paranormalsInitialized) return;
+  paranormalAudios = paranormalClipSources.map(src => {
+    const a = new Audio(src);
+    a.preload = "auto";
+    a.volume = 0.95; // volumen alto
+    return a;
+  });
+  paranormalsInitialized = true;
+}
+
+// Reproduce un clip paranormal aleatorio
+function playRandomParanormalClip() {
+  if (!paranormalAudios.length) return;
+  const idx = Math.floor(Math.random() * paranormalAudios.length);
+  const audio = paranormalAudios[idx];
+
+  try {
+    audio.currentTime = 0;
+  } catch (e) {}
+  audio.play().catch(() => {});
+}
+
 // No mostramos texto
 if (msgEl) {
   msgEl.textContent = "";
 }
 
-// ---------- Utilidades de audio ----------
-
-// Clip paranormal aleatorio (nuevo Audio para que puedan solaparse)
-function playRandomParanormalClip() {
-  if (!paranormalClips.length) return;
-  const idx = Math.floor(Math.random() * paranormalClips.length);
-  const src = paranormalClips[idx];
-  const audio = new Audio(src);
-  audio.volume = 0.95; // volumen alto
-  audio.play().catch(() => {});
-}
+// ---------- Utilidades de audio para radio ----------
 
 // Reproduce un trozo aleatorio de 2 segundos de radio.mp3
 function playRandomRadioSlice() {
@@ -90,7 +109,10 @@ function scheduleParanormals(intervalSec) {
     playRandomParanormalClip();
 
     // Luego cada intervalo fijo
-    paranormalTimerId = setInterval(playRandomParanormalClip, intervalSec * 1000);
+    paranormalTimerId = setInterval(
+      playRandomParanormalClip,
+      intervalSec * 1000
+    );
   }, intervalSec * 1000);
 }
 
@@ -132,8 +154,11 @@ function stopRadio() {
   radioBank.pause();
 }
 
-// Botón (también sirve para desbloquear audio en móvil)
+// Botón (inicializa audios y desbloquea sonido en móvil)
 btnToggle.addEventListener("click", () => {
+  // Crear y preparar los audios paranormales dentro del gesto del usuario
+  initParanormalAudios();
+
   // Intento de play para desbloquear audio en iOS/Android
   staticNoise.play().catch(() => {});
   radioBank.play().catch(() => {
