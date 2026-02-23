@@ -1,10 +1,15 @@
-let timerId = null;
 let running = false;
 
 const msgEl = document.getElementById("message");
 const btnToggle = document.getElementById("btnToggle");
+
 const staticNoise = document.getElementById("staticNoise");
 const radioBank = document.getElementById("radioBank");
+
+// Timer para trozos de radio
+let radioTimerId = null;
+// Timer para clips paranormales (después del primer intervalo)
+let paranormalTimerId = null;
 
 // Clips paranormales: 1.mp3, 2.mp3, 3.mp3...
 const paranormalClips = [
@@ -14,7 +19,7 @@ const paranormalClips = [
   // añade más: "4.mp3", "5.mp3", ...
 ];
 
-// Al iniciar, quitamos el texto para que no muestre nada
+// No mostramos texto
 if (msgEl) {
   msgEl.textContent = "";
 }
@@ -72,13 +77,21 @@ function playRandomRadioSlice() {
   }, 50);
 }
 
-// Una “transmisión”: trozo de radio + clip paranormal
-function transmit() {
+// Una “transmisión” de radio: solo trozo de radio
+function transmitRadio() {
   playRandomRadioSlice();
-  // Ligerísimo retardo para que el paranormal entre justo encima de la radio
+}
+
+// Programa los clips paranormales para que empiecen tras el primer intervalo
+function scheduleParanormals(intervalSec) {
+  // Espera el primer intervalo completo antes de sonar
   setTimeout(() => {
+    // Primera vez
     playRandomParanormalClip();
-  }, 300);
+
+    // Luego cada intervalo fijo
+    paranormalTimerId = setInterval(playRandomParanormalClip, intervalSec * 1000);
+  }, intervalSec * 1000);
 }
 
 // ---------- Control de la “radio” ----------
@@ -90,21 +103,29 @@ function startRadio() {
 
   const intervalSec = 30; // 30 segundos fijo
 
+  // Estático ambiente continuo
   staticNoise.volume = 0.15;
   staticNoise.play().catch(() => {});
 
-  // Primera transmisión inmediata
-  transmit();
-  timerId = setInterval(transmit, intervalSec * 1000);
-}
+  // Radio: primera transmisión inmediata
+  transmitRadio();
+  radioTimerId = setInterval(transmitRadio, intervalSec * 1000);
 
+  // Paranormales: empiezan después del primer intervalo
+  scheduleParanormals(intervalSec);
+}
 
 function stopRadio() {
   running = false;
   btnToggle.textContent = "Iniciar";
-  if (timerId) {
-    clearInterval(timerId);
-    timerId = null;
+
+  if (radioTimerId) {
+    clearInterval(radioTimerId);
+    radioTimerId = null;
+  }
+  if (paranormalTimerId) {
+    clearInterval(paranormalTimerId);
+    paranormalTimerId = null;
   }
 
   staticNoise.pause();
