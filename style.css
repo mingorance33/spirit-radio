@@ -46,7 +46,6 @@ h1 {
   overflow: hidden;
 }
 
-/* línea fina y lenta del dial */
 .dial-line {
   position: absolute;
   top: 50%;
@@ -60,12 +59,8 @@ h1 {
 }
 
 @keyframes dial-move {
-  0% {
-    left: 0%;
-  }
-  100% {
-    left: calc(100% - 70px);
-  }
+  0% { left: 0%; }
+  100% { left: calc(100% - 70px); }
 }
 
 .frequency-labels {
