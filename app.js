@@ -10,7 +10,7 @@ let radioTimerId = null;
 let paranormalTimerId = null;
 let phrases = [];
 
-// 1. Cargar frases desde el JSON
+// Cargar frases desde el JSON
 fetch('phrases.json')
   .then(response => response.json())
   .then(data => {
@@ -18,12 +18,31 @@ fetch('phrases.json')
   })
   .catch(err => console.error("Error cargando frases:", err));
 
-// Inicializar el dial pausado al cargar la página
+// Inicializar estado
 window.addEventListener('load', () => {
   if (dialEl) dialEl.classList.add('paused-anim');
+  if (msgEl) msgEl.textContent = "---.--- kHz";
 });
 
-// 2. Función de voz de ultratumba
+// Función para simular el dial numérico con 3 decimales
+function animateFrequency(callback) {
+  let steps = 0;
+  const maxSteps = 20; // Duración del parpadeo de números
+  
+  const interval = setInterval(() => {
+    // Generar número aleatorio entre 153 y 281 con 3 decimales
+    const randomFreq = (Math.random() * (281 - 153) + 153).toFixed(3);
+    if (msgEl) msgEl.textContent = `${randomFreq} kHz`;
+    
+    steps++;
+    if (steps >= maxSteps) {
+      clearInterval(interval);
+      callback(); // Ejecutar la voz cuando el número se detenga
+    }
+  }, 50);
+}
+
+// Función de voz de ultratumba
 function speakTetric(text) {
   if (!running || !text || !window.speechSynthesis) return;
 
@@ -44,7 +63,7 @@ function speakTetric(text) {
         window.speechSynthesis.cancel();
         return;
     }
-    if (msgEl) msgEl.textContent = text;
+    // Efecto visual y físico
     if (dialEl) dialEl.style.boxShadow = "0 0 20px #ff0000";
     staticNoise.volume = 0.05;
     
@@ -61,7 +80,7 @@ function speakTetric(text) {
   window.speechSynthesis.speak(utterance);
 }
 
-// 3. Reproducir trozos de radio.mp3
+// Reproducir trozos de radio.mp3
 function playRandomRadioSlice() {
   if (!running || !radioBank.duration || Number.isNaN(radioBank.duration)) return;
 
@@ -82,13 +101,12 @@ function playRandomRadioSlice() {
   }, 50);
 }
 
-// 4. Controles principales
+// Controles principales
 function startRadio() {
   if (running) return;
   running = true;
   btnToggle.textContent = "Detener";
 
-  // ACTIVAR ESCANEO (Quitar pausa de animación)
   if (dialEl) dialEl.classList.remove('paused-anim');
 
   const intervalSec = 25; 
@@ -104,8 +122,11 @@ function startRadio() {
 
   paranormalTimerId = setInterval(() => {
       if(running && phrases.length > 0) {
-          const idx = Math.floor(Math.random() * phrases.length);
-          speakTetric(phrases[idx]);
+          // Primero animamos el número, luego habla
+          animateFrequency(() => {
+              const idx = Math.floor(Math.random() * phrases.length);
+              speakTetric(phrases[idx]);
+          });
       }
   }, (intervalSec + 5) * 1000); 
 }
@@ -114,7 +135,6 @@ function stopRadio() {
   running = false;
   btnToggle.textContent = "Iniciar";
 
-  // PAUSAR ESCANEO (Añadir clase de pausa)
   if (dialEl) dialEl.classList.add('paused-anim');
 
   clearInterval(radioTimerId);
@@ -123,12 +143,11 @@ function stopRadio() {
   paranormalTimerId = null;
 
   staticNoise.pause();
-  staticNoise.currentTime = 0;
   radioBank.pause();
   
   window.speechSynthesis.cancel();
 
-  if (msgEl) msgEl.textContent = "";
+  if (msgEl) msgEl.textContent = "---.--- kHz";
   if (dialEl) dialEl.style.boxShadow = "0 0 8px rgba(0, 255, 255, 0.6)";
 }
 
