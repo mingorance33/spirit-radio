@@ -3,8 +3,6 @@ let running = false;
 
 const msgEl = document.getElementById("message");
 const btnToggle = document.getElementById("btnToggle");
-const intervalInput = document.getElementById("intervalInput");
-
 const staticNoise = document.getElementById("staticNoise");
 const radioBank = document.getElementById("radioBank");
 
@@ -90,9 +88,8 @@ function startRadio() {
   running = true;
   btnToggle.textContent = "Detener";
 
-  const intervalSec = Math.max(3, Number(intervalInput.value) || 10);
+  const intervalSec = 30; // 30 segundos fijo
 
-  // Estático ambiente continuo
   staticNoise.volume = 0.15;
   staticNoise.play().catch(() => {});
 
@@ -100,6 +97,7 @@ function startRadio() {
   transmit();
   timerId = setInterval(transmit, intervalSec * 1000);
 }
+
 
 function stopRadio() {
   running = false;
