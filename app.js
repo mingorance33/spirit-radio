@@ -1,78 +1,104 @@
-let phrases = [];
 let timerId = null;
 let running = false;
 
 const msgEl = document.getElementById("message");
 const btnToggle = document.getElementById("btnToggle");
 const intervalInput = document.getElementById("intervalInput");
-const noise = document.getElementById("noise");
 
-const synth = window.speechSynthesis;
+const staticNoise = document.getElementById("staticNoise");
+const radioBank = document.getElementById("radioBank");
 
-// Cargar frases desde el JSON
-async function loadPhrases() {
-  try {
-    const res = await fetch("phrases.json");
-    const data = await res.json();
-    phrases = Array.isArray(data.phrases) ? data.phrases : [];
-  } catch (err) {
-    console.error(err);
-    phrases = [];
-  }
+// Clips paranormales: 1.mp3, 2.mp3, 3.mp3...
+const paranormalClips = [
+  "1.mp3",
+  "2.mp3",
+  "3.mp3"
+  // añade más: "4.mp3", "5.mp3", ...
+];
+
+// Al iniciar, quitamos el texto para que no muestre nada
+if (msgEl) {
+  msgEl.textContent = "";
 }
 
-// Devuelve una frase aleatoria
-function getRandomPhrase() {
-  if (!phrases.length) return "";
-  const idx = Math.floor(Math.random() * phrases.length);
-  return phrases[idx];
+// ---------- Utilidades de audio ----------
+
+// Clip paranormal aleatorio (nuevo Audio para que puedan solaparse)
+function playRandomParanormalClip() {
+  if (!paranormalClips.length) return;
+  const idx = Math.floor(Math.random() * paranormalClips.length);
+  const src = paranormalClips[idx];
+  const audio = new Audio(src);
+  audio.volume = 0.95; // volumen alto
+  audio.play().catch(() => {});
 }
 
-// Hablar una frase con voz sintética
-function speakPhrase(text) {
-  if (!("speechSynthesis" in window)) return;
-  synth.cancel();
-  const utter = new SpeechSynthesisUtterance(text);
-  utter.lang = "es-ES";
-  utter.rate = 0.9;
-  utter.pitch = 1.0;
-  utter.volume = 1.0;
-  synth.speak(utter);
-}
-
-// Muestra una transmisión y la habla
-function transmit() {
-  const phrase = getRandomPhrase();
-  if (!phrase) {
-    msgEl.textContent = "Sin datos en phrases.json";
+// Reproduce un trozo aleatorio de 2 segundos de radio.mp3
+function playRandomRadioSlice() {
+  if (!radioBank.duration || Number.isNaN(radioBank.duration)) {
+    // Si aún no se ha cargado la duración, esperamos al evento y reintentamos
+    radioBank.addEventListener(
+      "loadedmetadata",
+      () => {
+        playRandomRadioSlice();
+      },
+      { once: true }
+    );
     return;
   }
 
-  msgEl.textContent = "";
-  let i = 0;
-  const chars = phrase.split("");
-  const typeInterval = setInterval(() => {
-    msgEl.textContent += chars[i];
-    i++;
-    if (i >= chars.length) {
-      clearInterval(typeInterval);
-      speakPhrase(phrase);
+  const total = radioBank.duration; // en segundos
+  const sliceLength = 2; // duración del trozo
+
+  if (total <= sliceLength) {
+    // Si el archivo es muy corto, lo reproducimos tal cual
+    radioBank.currentTime = 0;
+    radioBank.play().catch(() => {});
+    return;
+  }
+
+  // Elegimos un inicio aleatorio que deje 2s hasta el final
+  const start = Math.random() * (total - sliceLength);
+  const end = start + sliceLength;
+
+  radioBank.currentTime = start;
+  radioBank.volume = 0.35; // volumen bajo/medio
+  radioBank.play().catch(() => {});
+
+  // Parar justo a los 2 segundos
+  const stopTimer = setInterval(() => {
+    if (radioBank.currentTime >= end || radioBank.paused) {
+      radioBank.pause();
+      clearInterval(stopTimer);
     }
-  }, 80);
+  }, 50);
 }
 
-// Arrancar / parar radio
+// Una “transmisión”: trozo de radio + clip paranormal
+function transmit() {
+  playRandomRadioSlice();
+  // Ligerísimo retardo para que el paranormal entre justo encima de la radio
+  setTimeout(() => {
+    playRandomParanormalClip();
+  }, 300);
+}
+
+// ---------- Control de la “radio” ----------
+
 function startRadio() {
   if (running) return;
   running = true;
   btnToggle.textContent = "Detener";
 
   const intervalSec = Math.max(3, Number(intervalInput.value) || 10);
+
+  // Estático ambiente continuo
+  staticNoise.volume = 0.15;
+  staticNoise.play().catch(() => {});
+
+  // Primera transmisión inmediata
   transmit();
   timerId = setInterval(transmit, intervalSec * 1000);
-
-  noise.volume = 0.4;
-  noise.play().catch(() => {});
 }
 
 function stopRadio() {
@@ -82,16 +108,18 @@ function stopRadio() {
     clearInterval(timerId);
     timerId = null;
   }
-  msgEl.textContent = "Esperando transmisión...";
-  noise.pause();
-  synth.cancel();
+
+  staticNoise.pause();
+  radioBank.pause();
 }
 
-// Botón (activa audio/voz en móviles)
+// Botón (también sirve para desbloquear audio en móvil)
 btnToggle.addEventListener("click", () => {
-  noise.play().catch(() => {});
-  speakPhrase(" "); // pequeño truco para activar voces
-  synth.cancel();
+  // Intento de play para desbloquear audio en iOS/Android
+  staticNoise.play().catch(() => {});
+  radioBank.play().catch(() => {
+    radioBank.pause();
+  });
 
   if (running) {
     stopRadio();
@@ -99,6 +127,3 @@ btnToggle.addEventListener("click", () => {
     startRadio();
   }
 });
-
-// Cargar frases al inicio
-loadPhrases();
