@@ -38,46 +38,68 @@ h1 {
   border: 1px solid #222;
 }
 
-.dial-wrapper {
+/* Layout general del bloque de radio */
+.radio-layout {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* Contenedor vertical del dial */
+.dial-wrapper-vertical {
   position: relative;
-  height: 30px;
-  border-radius: 6px;
+  width: 26px;
+  height: 160px;
+  border-radius: 999px;
   background: radial-gradient(circle at 50% 50%, #222 0, #050505 70%);
   overflow: hidden;
 }
 
-.dial-line {
+/* Línea que sube y baja lentamente (1 min de abajo a arriba) */
+.dial-line-vertical {
   position: absolute;
-  top: 50%;
-  left: 0;
-  width: 70px;
-  height: 2px;
-  transform: translateY(-50%);
-  background: linear-gradient(90deg, #0ff, #0aa);
+  left: 50%;
+  bottom: 0;
+  width: 2px;
+  height: 60px;               /* largo de la “aguja” */
+  transform: translateX(-50%);
+  background: linear-gradient(#0ff, #0aa);
   box-shadow: 0 0 8px rgba(0, 255, 255, 0.6);
-  animation: dial-move 60s infinite alternate ease-in-out;
+  animation: dial-move-vertical 60s infinite alternate ease-in-out;
 }
 
-@keyframes dial-move {
-  0% { left: 0%; }
-  100% { left: calc(100% - 70px); }
+/* De abajo (0%) a arriba (100%) en 60s */
+@keyframes dial-move-vertical {
+  0% {
+    bottom: 0%;
+  }
+  100% {
+    bottom: calc(100% - 60px);
+  }
 }
 
-.frequency-labels {
+/* Frecuencias en columna, al lado del dial */
+.frequency-labels-vertical {
   display: flex;
+  flex-direction: column;
   justify-content: space-between;
+  height: 160px;
   font-size: 0.7rem;
   opacity: 0.8;
-  margin-top: 0.35rem;
 }
 
 .display {
   margin-top: 1rem;
   padding: 0.8rem 1rem;
-  min-height: 60px;
+  min-height: 40px;
   border-radius: 8px;
   border: 1px solid #333;
-  background: linear-gradient(135deg, rgba(0, 0, 0, 0.8), rgba(20, 20, 40, 0.95));
+  background: linear-gradient(
+    135deg,
+    rgba(0, 0, 0, 0.8),
+    rgba(20, 20, 40, 0.95)
+  );
   display: flex;
   align-items: center;
   justify-content: center;
@@ -85,7 +107,7 @@ h1 {
 
 #message {
   text-align: center;
-  font-size: 1rem;
+  font-size: 0.9rem;
   line-height: 1.4;
   white-space: pre-wrap;
 }
@@ -114,20 +136,4 @@ button {
 
 button:hover {
   filter: brightness(1.1);
-}
-
-label {
-  font-size: 0.75rem;
-  display: flex;
-  gap: 0.3rem;
-  align-items: center;
-}
-
-input[type="number"] {
-  width: 60px;
-  padding: 0.2rem 0.4rem;
-  border-radius: 6px;
-  border: 1px solid #444;
-  background: #111;
-  color: #eee;
 }
