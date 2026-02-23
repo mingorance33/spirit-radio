@@ -1,145 +1,161 @@
+/* --- ESTILOS BASE --- */
 * {
   box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, sans-serif;
-  background: radial-gradient(#050509, #000);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: radial-gradient(#0a0a14, #000);
   color: #f5f5f5;
   display: flex;
   justify-content: center;
   align-items: center;
   min-height: 100vh;
+  overflow: hidden; /* Evita scrolls raros en móviles */
 }
 
 .app {
-  width: 100%;
-  max-width: 500px;
-  padding: 1.5rem;
-  background: rgba(10, 10, 20, 0.9);
-  border-radius: 12px;
-  box-shadow: 0 0 25px rgba(0, 255, 255, 0.25);
+  width: 90%;
+  max-width: 450px;
+  padding: 2rem;
+  background: rgba(15, 15, 25, 0.95);
+  border-radius: 20px;
+  box-shadow: 0 0 30px rgba(0, 255, 255, 0.15), inset 0 0 10px rgba(255, 255, 255, 0.05);
+  border: 1px solid #222;
 }
 
 h1 {
   text-align: center;
   margin-top: 0;
-  margin-bottom: 1.5rem;
-  letter-spacing: 0.15em;
-  font-size: 1.1rem;
+  margin-bottom: 2rem;
+  letter-spacing: 0.2em;
+  font-size: 1.2rem;
   text-transform: uppercase;
+  color: #0ff;
+  text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
 }
 
+/* --- SECCIÓN DEL DIAL --- */
 .radio {
-  background: #111;
-  border-radius: 10px;
-  padding: 1rem;
-  border: 1px solid #222;
+  background: #050505;
+  border-radius: 12px;
+  padding: 1.5rem 1rem;
+  border: 2px solid #1a1a1a;
+  box-shadow: inset 0 0 15px #000;
 }
 
-/* Dial horizontal como “ventana” */
 .dial-wrapper {
   position: relative;
-  height: 40px;
-  border-radius: 10px;
-  background: radial-gradient(circle at 50% 50%, #222 0, #050505 70%);
+  height: 50px;
+  border-radius: 4px;
+  background: linear-gradient(to bottom, #111, #1a1a1a, #111);
+  border: 1px solid #333;
   overflow: hidden;
 }
 
-/* Barra fina vertical que se desplaza horizontalmente */
+/* La barra que se mueve */
 .dial-line {
   position: absolute;
-  top: 4px;
-  bottom: 4px;        /* ocupa casi toda la altura */
+  top: 0;
+  bottom: 0;
   left: 0;
-  width: 3px;         /* fina y vertical */
-  background: linear-gradient(#0ff, #0aa);
-  box-shadow: 0 0 8px rgba(0, 255, 255, 0.6);
+  width: 4px;
+  background: linear-gradient(to right, #0ff, #fff, #0ff);
+  box-shadow: 0 0 12px rgba(0, 255, 255, 0.8);
+  z-index: 2;
+  /* Animación de 60 segundos de ida y vuelta */
   animation: dial-move 60s infinite alternate ease-in-out;
 }
 
-/* Se mueve de izquierda a derecha en 60s (1 min) */
-@keyframes dial-move {
-  0% {
-    left: 0%;
-  }
-  100% {
-    left: calc(100% - 3px);
-  }
+/* Clase para congelar el dial cuando se pulsa Detener */
+.paused-anim {
+  animation-play-state: paused !important;
 }
 
-/* Frecuencias bajo el dial */
+@keyframes dial-move {
+  0% { left: 0%; }
+  100% { left: calc(100% - 4px); }
+}
+
+/* Números de referencia bajo el dial */
 .frequency-labels {
   display: flex;
   justify-content: space-between;
-  font-size: 0.7rem;
-  opacity: 0.8;
-  margin-top: 0.35rem;
-}
-
-.display {
-  margin-top: 1rem;
-  padding: 0.8rem 1rem;
-  min-height: 40px;
-  border-radius: 8px;
-  border: 1px solid #333;
-  background: linear-gradient(
-    135deg,
-    rgba(0, 0, 0, 0.8),
-    rgba(20, 20, 40, 0.95)
-  );
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-#message {
-  text-align: center;
-  font-size: 0.9rem;
-  line-height: 1.4;
-  white-space: pre-wrap;
-}
-
-.controls {
-  margin-top: 1rem;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  align-items: center;
-  justify-content: center;
-}
-
-button {
-  padding: 0.5rem 1.2rem;
-  border-radius: 999px;
-  border: none;
-  cursor: pointer;
-  background: #0ff;
-  color: #000;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
   font-size: 0.75rem;
+  color: #666;
+  margin-top: 0.6rem;
+  font-family: monospace;
 }
 
-button:hover {
-  filter: brightness(1.1);
-}
-/* Clase para pausar la animación del dial */
-.paused-anim {
-  animation-play-state: paused !important;
+/* --- PANTALLA DIGITAL (kHz) --- */
+.display {
+  margin-top: 1.5rem;
+  padding: 1.2rem;
+  min-height: 70px;
+  border-radius: 10px;
+  background: #000;
+  border: 1px solid #222;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-shadow: inset 0 0 10px rgba(0, 255, 255, 0.05);
 }
 
 #message {
   font-family: 'Courier New', Courier, monospace;
-  font-size: 1.5rem;
+  font-size: 1.8rem;
   color: #0ff;
-  text-shadow: 0 0 10px #0ff;
-  letter-spacing: 2px;
+  text-shadow: 0 0 12px rgba(0, 255, 255, 0.6);
   font-weight: bold;
+  letter-spacing: 1px;
+  transition: color 0.4s ease, text-shadow 0.4s ease;
 }
 
-.paused-anim {
-  animation-play-state: paused !important;
+/* Clase que activa JS cuando habla la voz */
+.evp-active {
+  color: #ff3333 !important;
+  text-shadow: 0 0 20px rgba(255, 0, 0, 0.8) !important;
+}
+
+/* --- BOTÓN DE CONTROL --- */
+.controls {
+  margin-top: 2rem;
+  display: flex;
+  justify-content: center;
+}
+
+#btnToggle {
+  padding: 1rem 2.5rem;
+  font-size: 1rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  background: transparent;
+  color: #0ff;
+  border: 2px solid #0ff;
+  border-radius: 50px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
+}
+
+#btnToggle:active {
+  transform: scale(0.95);
+}
+
+#btnToggle:hover {
+  background: rgba(0, 255, 255, 0.1);
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.4);
+}
+
+/* --- DECORACIONES EXTRA --- */
+.radio::after {
+  content: "LOW WAVE RECEIVER";
+  display: block;
+  text-align: center;
+  font-size: 0.5rem;
+  color: #333;
+  margin-top: 10px;
+  letter-spacing: 4px;
 }
