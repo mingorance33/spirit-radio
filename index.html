@@ -28,19 +28,19 @@
         <div class="sensor-grid">
           <div class="wave-track">
             <span class="sensor-label">RF</span>
-            <svg viewBox="0 0 500 40" class="wave-svg"><path class="path-radio" d="M0,20 Q25,5 50,20 T100,20 T150,20 T200,20 T250,20 T300,20 T350,20 T400,20 T450,20 T500,20"></path></svg>
+            <div class="wave-screen"><div class="wave-line line-rf"></div></div>
           </div>
           <div class="wave-track">
             <span class="sensor-label">KIN</span>
-            <svg viewBox="0 0 500 40" class="wave-svg"><path class="path-kinetic" d="M0,20 Q25,0 50,20 T100,20 T150,20 T200,20 T250,20 T300,20 T350,20 T400,20 T450,20 T500,20"></path></svg>
+            <div class="wave-screen"><div class="wave-line line-kin"></div></div>
           </div>
           <div class="wave-track">
             <span class="sensor-label">MAG</span>
-            <svg viewBox="0 0 500 40" class="wave-svg"><path class="path-magnetic" d="M0,20 Q25,10 50,20 T100,20 T150,20 T200,20 T250,20 T300,20 T350,20 T400,20 T450,20 T500,20"></path></svg>
+            <div class="wave-screen"><div class="wave-line line-mag"></div></div>
           </div>
           <div class="wave-track">
             <span class="sensor-label">IR</span>
-            <svg viewBox="0 0 500 40" class="wave-svg"><path class="path-thermal" d="M0,20 Q25,15 50,20 T100,20 T150,20 T200,20 T250,20 T300,20 T350,20 T400,20 T450,20 T500,20"></path></svg>
+            <div class="wave-screen"><div class="wave-line line-ir"></div></div>
           </div>
         </div>
         
@@ -57,13 +57,12 @@
           <span class="close">&times;</span>
           <h3>Protocolo de Vigilancia Espectral</h3>
           <div class="modal-scroll">
-            <p>Monitoreo independiente de cuatro canales críticos:</p>
-            <p><strong style="color:#0ff;">RF (Radiofrecuencia):</strong> Escaneo de la banda LW 153-281 kHz buscando picos de modulación no identificados.</p>
-            <p><strong style="color:#ffaa00;">KIN (Energía Cinética):</strong> Registro de micro-variaciones de masa y desplazamiento sutil en el eje Z.</p>
-            <p><strong style="color:#f0f;">MAG (Magnetismo):</strong> Monitoreo de la densidad del flujo magnético ambiental.</p>
-            <p><strong style="color:#ff3333;">IR (Infrarrojo):</strong> Detección de fluctuaciones térmicas en el espectro cercano.</p>
+            <p><strong style="color:#0ff;">RF (Radiofrecuencia):</strong> Escaneo de banda LW buscando picos de modulación.</p>
+            <p><strong style="color:#ffaa00;">KIN (Cinética):</strong> Micro-variaciones en el estado de reposo del terminal.</p>
+            <p><strong style="color:#f0f;">MAG (Magnetismo):</strong> Fluctuaciones en la densidad del flujo magnético local.</p>
+            <p><strong style="color:#ff3333;">IR (Infrarrojo):</strong> Variaciones térmicas en el espectro cercano.</p>
             <hr class="modal-divider">
-            <p><strong>Protocolo de Coincidencia:</strong> Si tres o más canales muestran actividad síncrona, el sistema extrae y procesa el EVP (Fenómeno de Voz Electrónica).</p>
+            <p><strong>Protocolo de Coincidencia:</strong> Ante actividad síncrona en múltiples canales, se procesa el EVP mediante el sintetizador interno.</p>
           </div>
         </div>
       </div>
