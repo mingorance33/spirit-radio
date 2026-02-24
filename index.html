@@ -15,7 +15,12 @@
           <div id="dial" class="dial-line paused-anim"></div>
         </div>
         <div class="frequency-labels">
-          <span>153 kHz</span><span>170</span><span>200</span><span>230</span><span>260</span><span>281 kHz</span>
+          <span>153 kHz</span>
+          <span>170</span>
+          <span>200</span>
+          <span>230</span>
+          <span>260</span>
+          <span>281 kHz</span>
         </div>
       </div>
 
@@ -25,24 +30,7 @@
 
       <div class="controls">
         <button id="btnToggle">Iniciar</button>
-        <button id="btnVisual" class="btn-secondary" style="width: auto; padding: 0 15px; border-radius: 50px; font-size: 0.8rem;">Visual</button>
         <button id="btnInfo" class="btn-secondary">?</button>
-      </div>
-
-      <div id="visualModal" class="sensor-modal">
-        <div class="sensor-header">
-          <div class="sensor-title">
-            <span>MONITOR DE ESPECTRO</span>
-            <small id="modalFreq">153.000 kHz</small>
-          </div>
-          <button id="closeVisual">&times;</button>
-        </div>
-        <div class="analyzer-grid-full">
-          <div class="eq-track" data-label="RADIO FREQUENCY (RF)"><div class="eq-container" id="eq-rf"></div></div>
-          <div class="eq-track" data-label="KINETIC ENERGY (KIN)"><div class="eq-container" id="eq-kin"></div></div>
-          <div class="eq-track" data-label="MAGNETIC FIELD (MAG)"><div class="eq-container" id="eq-mag"></div></div>
-          <div class="eq-track" data-label="INFRARED (IR)"><div class="eq-container" id="eq-ir"></div></div>
-        </div>
       </div>
 
       <div id="infoModal" class="modal">
@@ -50,7 +38,12 @@
           <span class="close">&times;</span>
           <h3>Protocolo de Vigilancia Espectral</h3>
           <div class="modal-scroll">
-            <p>La percepción de los sonidos paranormales se obtiene mediante el monitoreo de ondas reales.</p>
+            <p>La percepción de los sonidos paranormales se obtiene mediante el monitoreo de ondas reales del entorno:</p>
+            <p><strong>Ondas de Radio (LW):</strong> El móvil localiza y analiza ondas de radio (RF) específicamente en las bandas de baja frecuencia entre 153 y 281 kHz.</p>
+            <p><strong>Energía Cinética Sutil:</strong> Mediante los acelerómetros de alta precisión, la app detecta micro-vibraciones y variaciones en el estado de reposo del terminal.</p>
+            <p><strong>Sensores Complementarios:</strong> Se integran datos de magnetómetros y sensores infrarrojos para variaciones térmicas de proximidad.</p>
+            <hr class="modal-divider">
+            <p><strong>Protocolo de Coincidencia:</strong> Si se produce una coincidencia anormal, la aplicación muestra la última palabra aislada y la reproduce mediante el traductor interno para su análisis.</p>
           </div>
         </div>
       </div>

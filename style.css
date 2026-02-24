@@ -1,10 +1,4 @@
-/* =========================================
-   ESTILOS BASE Y APP PRINCIPAL
-   ========================================= */
-* { 
-  box-sizing: border-box; 
-  -webkit-tap-highlight-color: transparent;
-}
+* { box-sizing: border-box; }
 
 body {
   margin: 0;
@@ -38,64 +32,53 @@ h1 {
   color: #0ff;
 }
 
-/* =========================================
-   DIAL DE RADIO
-   ========================================= */
-.radio { 
-  background: #050505; 
-  border-radius: 15px; 
-  padding: 1.5rem; 
-  border: 1px solid #1a1a1a; 
-}
+.radio { background: #050505; border-radius: 15px; padding: 1.5rem; border: 1px solid #1a1a1a; }
 
 .dial-wrapper {
   position: relative;
   height: 50px;
   border-radius: 8px;
   background: #000;
-  border: 1px solid #333;
   overflow: hidden;
+  border: 1px solid #222;
 }
 
 .dial-line {
   position: absolute;
-  width: 2px;
-  height: 100%;
+  top: 0; bottom: 0; left: 0;
+  width: 3px;
   background: #0ff;
-  box-shadow: 0 0 10px #0ff;
-  animation: dial-move 30s infinite alternate ease-in-out;
+  box-shadow: 0 0 15px #0ff;
+  animation: dial-move 40s infinite alternate ease-in-out;
 }
 
-.paused-anim { 
-  animation-play-state: paused !important; 
-}
+/* Esta es la clase clave para el fallo que mencionas */
+.paused-anim { animation-play-state: paused !important; }
 
 @keyframes dial-move {
-  0% { left: 2%; }
-  100% { left: 98%; }
+  0% { left: 5%; }
+  100% { left: 95%; }
 }
 
 .frequency-labels {
   display: flex;
   justify-content: space-between;
-  margin-top: 0.5rem;
-  font-size: 0.7rem;
-  color: #555;
+  font-size: 0.65rem;
+  color: #444;
+  margin-top: 0.6rem;
   font-family: monospace;
 }
 
-/* =========================================
-   DISPLAY DE MENSAJES (OFFLINE / kHz)
-   ========================================= */
 .display {
-  background: #000;
   margin-top: 1.5rem;
-  height: 100px;
+  padding: 1.2rem;
+  min-height: 70px;
   border-radius: 10px;
+  background: #000;
+  border: 1px solid #222;
   display: flex;
   justify-content: center;
   align-items: center;
-  border: 1px solid #1a1a1a;
 }
 
 #message {
@@ -103,7 +86,6 @@ h1 {
   font-size: 1.6rem;
   color: #0ff;
   font-weight: bold;
-  text-align: center;
 }
 
 .evp-active {
@@ -111,15 +93,7 @@ h1 {
   text-shadow: 0 0 20px rgba(255, 0, 0, 0.8) !important;
 }
 
-/* =========================================
-   CONTROLES Y BOTONES
-   ========================================= */
-.controls { 
-  margin-top: 2rem; 
-  display: flex; 
-  justify-content: center; 
-  gap: 15px; 
-}
+.controls { margin-top: 2rem; display: flex; justify-content: center; gap: 15px; }
 
 #btnToggle {
   padding: 1rem 2.5rem;
@@ -130,10 +104,7 @@ h1 {
   font-weight: bold;
   cursor: pointer;
   text-transform: uppercase;
-  transition: transform 0.1s;
 }
-
-#btnToggle:active { transform: scale(0.95); }
 
 .btn-secondary {
   width: 50px;
@@ -144,115 +115,8 @@ h1 {
   border: 1px solid #0ff;
   cursor: pointer;
   font-size: 1.2rem;
-  display: flex;
-  justify-content: center;
-  align-items: center;
 }
 
-/* Estilo específico para el botón Visual (texto en lugar de icono) */
-#btnVisual {
-  width: auto;
-  padding: 0 20px;
-  border-radius: 50px;
-  font-size: 0.8rem;
-  font-weight: bold;
-  text-transform: uppercase;
-}
-
-/* =========================================
-   VENTANA DE SENSORES (MODAL VISUAL)
-   ========================================= */
-.sensor-modal {
-  display: none; /* Se activa por JS */
-  position: fixed;
-  top: 0; 
-  left: 0; 
-  width: 100%; 
-  height: 100%;
-  background: #000;
-  z-index: 2000;
-  padding: 20px;
-  flex-direction: column;
-}
-
-.sensor-header {
-  display: flex; 
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid rgba(0, 255, 255, 0.3);
-  margin-bottom: 20px; 
-  padding-bottom: 10px;
-}
-
-.sensor-title span { 
-  color: #0ff; 
-  font-weight: bold; 
-  display: block; 
-  letter-spacing: 1px;
-}
-
-.sensor-title small { 
-  color: #7cfcff; 
-  font-family: monospace; 
-  font-size: 1.1rem; 
-}
-
-#closeVisual { 
-  background: none; 
-  border: none; 
-  color: #0ff; 
-  font-size: 2.5rem; 
-  cursor: pointer; 
-}
-
-/* Grilla de ecualizadores */
-.analyzer-grid-full { 
-  flex-grow: 1; 
-  display: flex; 
-  flex-direction: column; 
-  justify-content: space-around; 
-}
-
-.eq-track { 
-  position: relative; 
-  width: 100%; 
-  padding-top: 15px; 
-}
-
-.eq-track::before {
-  content: attr(data-label); 
-  position: absolute; 
-  top: 0; 
-  left: 0;
-  font-size: 10px; 
-  font-family: monospace; 
-  color: rgba(0, 255, 255, 0.5);
-}
-
-.eq-container { 
-  display: flex; 
-  align-items: flex-end; 
-  height: 70px; 
-  width: 100%; 
-  gap: 1px; /* Espacio entre barras */
-}
-
-.bar { 
-  flex: 1; 
-  height: 5%; 
-  min-width: 1px; 
-  transition: height 0.05s ease; 
-}
-
-/* Degradados por canal (Vertical) */
-#eq-rf .bar { background: linear-gradient(to top, #ff2a2a, #ffcc00); }
-#eq-kin .bar { background: linear-gradient(to top, #aa00ff, #00d4ff); }
-#eq-mag .bar { background: linear-gradient(to top, #0055ff, #00ffff); }
-#eq-ir .bar { background: linear-gradient(to top, #00ff88, #ffff00); }
-
-/* =========================================
-   MODAL DE INFORMACIÓN (?)
-   ========================================= */
 .modal {
   display: none;
   position: fixed;
@@ -264,26 +128,18 @@ h1 {
 }
 
 .modal-content {
-  background: #111;
-  margin: 15% auto;
-  padding: 2rem;
+  background: #0a0a14;
+  margin: 10% auto;
+  padding: 25px;
+  border: 1px solid #0ff;
   width: 85%;
   max-width: 400px;
-  border: 1px solid #333;
   border-radius: 15px;
   position: relative;
-  color: #ccc;
-  line-height: 1.4;
 }
 
-.close {
-  position: absolute;
-  top: 10px; right: 20px;
-  color: #555;
-  font-size: 28px;
-  cursor: pointer;
-}
-
-.close:hover { color: #fff; }
-
-.
+.modal-scroll { max-height: 60vh; overflow-y: auto; font-size: 0.85rem; line-height: 1.5; color: #ccc; }
+.modal-content h3 { color: #0ff; margin-top: 0; text-transform: uppercase; border-bottom: 1px solid #0ff; padding-bottom: 10px; }
+.modal-content strong { color: #0ff; display: block; margin-top: 10px; }
+.modal-divider { border: 0; border-top: 1px solid #0ff; margin: 15px 0; opacity: 0.3; }
+.close { position: absolute; right: 15px; top: 10px; font-size: 28px; color: #0ff; cursor: pointer; }
