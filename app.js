@@ -11,11 +11,9 @@ let paranormalTimerId = null;
 let displayUpdateId = null;
 let phrases = [];
 
-// Cargar frases
 fetch('phrases.json')
   .then(response => response.json())
-  .then(data => phrases = data.phrases)
-  .catch(err => console.error("Error frases:", err));
+  .then(data => phrases = data.phrases);
 
 function updateFrequencyDisplay() {
   if (!dialEl || !dialWrapper || !running) return;
@@ -58,6 +56,7 @@ function playRandomRadioSlice() {
 function startRadio() {
   running = true;
   btnToggle.textContent = "Detener";
+  // Quita la pausa para que empiece a moverse
   dialEl.classList.remove('paused-anim');
   
   displayUpdateId = setInterval(updateFrequencyDisplay, 50);
@@ -77,7 +76,9 @@ function startRadio() {
 function stopRadio() {
   running = false;
   btnToggle.textContent = "Iniciar";
+  // Añade la pausa para detener el dial
   dialEl.classList.add('paused-anim');
+  
   clearInterval(displayUpdateId);
   clearInterval(radioTimerId);
   clearInterval(paranormalTimerId);
@@ -92,7 +93,6 @@ btnToggle.addEventListener("click", () => {
   if (running) stopRadio(); else startRadio();
 });
 
-// Control del Modal
 const modal = document.getElementById("infoModal");
 const btnInfo = document.getElementById("btnInfo");
 const spanClose = document.querySelector(".close");
