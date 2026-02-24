@@ -1,5 +1,6 @@
-/* --- Mantener todos tus estilos anteriores intactos --- */
+/* --- ESTILOS BASE --- */
 * { box-sizing: border-box; }
+
 body {
   margin: 0;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -11,15 +12,17 @@ body {
   min-height: 100vh;
   overflow: hidden;
 }
+
 .app {
   width: 90%;
   max-width: 450px;
   padding: 2rem;
   background: rgba(15, 15, 25, 0.95);
   border-radius: 20px;
-  box-shadow: 0 0 30px rgba(0, 255, 255, 0.15), inset 0 0 10px rgba(255, 255, 255, 0.05);
+  box-shadow: 0 0 30px rgba(0, 255, 255, 0.15);
   border: 1px solid #222;
 }
+
 h1 {
   text-align: center;
   margin-top: 0;
@@ -28,32 +31,96 @@ h1 {
   font-size: 1.2rem;
   text-transform: uppercase;
   color: #0ff;
-  text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
 }
-.radio { background: #050505; border-radius: 15px; padding: 1.5rem; border: 1px solid #1a1a1a; }
-.dial-wrapper { position: relative; height: 50px; border-radius: 8px; background: #000; overflow: hidden; border: 1px solid #222; box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.8); }
-.dial-line { position: absolute; top: 0; bottom: 0; left: 0; width: 3px; background: #0ff; box-shadow: 0 0 15px #0ff; animation: dial-move 40s infinite alternate ease-in-out; }
-.paused-anim { animation-play-state: paused !important; }
-@keyframes dial-move { 0% { left: 5%; } 100% { left: 95%; } }
-.frequency-labels { display: flex; justify-content: space-between; font-size: 0.65rem; color: #444; margin-top: 0.6rem; font-family: monospace; }
-.display { margin-top: 1.5rem; padding: 1.2rem; min-height: 70px; border-radius: 10px; background: #000; border: 1px solid #222; display: flex; justify-content: center; align-items: center; box-shadow: inset 0 0 10px rgba(0, 255, 255, 0.05); }
-#message { font-family: 'Courier New', Courier, monospace; font-size: 1.8rem; color: #0ff; text-shadow: 0 0 12px rgba(0, 255, 255, 0.6); font-weight: bold; letter-spacing: 1px; transition: color 0.4s ease, text-shadow 0.4s ease; }
-.evp-active { color: #ff3333 !important; text-shadow: 0 0 20px rgba(255, 0, 0, 0.8) !important; }
-.controls { margin-top: 2rem; display: flex; justify-content: center; gap: 15px; }
-#btnToggle { padding: 1rem 2.5rem; border-radius: 50px; border: none; background: #0ff; color: #000; font-weight: bold; cursor: pointer; text-transform: uppercase; transition: all 0.3s; box-shadow: 0 0 15px rgba(0, 255, 255, 0.3); }
 
-/* --- NUEVOS ESTILOS PARA EXPLICACIÓN --- */
+/* --- RADIO Y DIAL --- */
+.radio { background: #050505; border-radius: 15px; padding: 1.5rem; border: 1px solid #1a1a1a; }
+
+.dial-wrapper {
+  position: relative;
+  height: 50px;
+  border-radius: 8px;
+  background: #000;
+  overflow: hidden;
+  border: 1px solid #222;
+}
+
+.dial-line {
+  position: absolute;
+  top: 0; bottom: 0; left: 0;
+  width: 3px;
+  background: #0ff;
+  box-shadow: 0 0 15px #0ff;
+  animation: dial-move 40s infinite alternate ease-in-out;
+}
+
+.paused-anim { animation-play-state: paused !important; }
+
+@keyframes dial-move {
+  0% { left: 5%; }
+  100% { left: 95%; }
+}
+
+.frequency-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.65rem;
+  color: #444;
+  margin-top: 0.6rem;
+  font-family: monospace;
+}
+
+/* --- DISPLAY --- */
+.display {
+  margin-top: 1.5rem;
+  padding: 1.2rem;
+  min-height: 70px;
+  border-radius: 10px;
+  background: #000;
+  border: 1px solid #222;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+#message {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 1.8rem;
+  color: #0ff;
+  font-weight: bold;
+}
+
+.evp-active {
+  color: #ff3333 !important;
+  text-shadow: 0 0 20px rgba(255, 0, 0, 0.8) !important;
+}
+
+/* --- CONTROLES --- */
+.controls { margin-top: 2rem; display: flex; justify-content: center; gap: 15px; }
+
+#btnToggle {
+  padding: 1rem 2.5rem;
+  border-radius: 50px;
+  border: none;
+  background: #0ff;
+  color: #000;
+  font-weight: bold;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+
 .btn-secondary {
   width: 50px;
   height: 50px;
   border-radius: 50%;
-  background: #222;
+  background: #1a1a2e;
   color: #0ff;
   border: 1px solid #0ff;
   cursor: pointer;
   font-size: 1.2rem;
-  font-weight: bold;
 }
+
+/* --- MODAL --- */
 .modal {
   display: none;
   position: fixed;
@@ -63,17 +130,20 @@ h1 {
   background: rgba(0,0,0,0.9);
   backdrop-filter: blur(5px);
 }
+
 .modal-content {
-  background: #0f0f19;
+  background: #0a0a14;
   margin: 10% auto;
   padding: 25px;
   border: 1px solid #0ff;
   width: 85%;
   max-width: 400px;
   border-radius: 15px;
-  color: #eee;
   position: relative;
 }
-.modal-scroll { max-height: 60vh; overflow-y: auto; line-height: 1.6; font-size: 0.9rem; }
-.modal-content h3 { color: #0ff; margin-top: 0; text-transform: uppercase; }
+
+.modal-scroll { max-height: 60vh; overflow-y: auto; font-size: 0.9rem; line-height: 1.5; color: #ccc; }
+.modal-content h3 { color: #0ff; margin-top: 0; text-transform: uppercase; border-bottom: 1px solid #0ff; padding-bottom: 10px; }
+.modal-content strong { color: #0ff; display: block; margin-top: 10px; }
+.modal-divider { border: 0; border-top: 1px solid #0ff; margin: 15px 0; opacity: 0.3; }
 .close { position: absolute; right: 15px; top: 10px; font-size: 28px; color: #0ff; cursor: pointer; }
