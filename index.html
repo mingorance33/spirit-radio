@@ -2,8 +2,8 @@
 <html lang="es">
   <head>
     <meta charset="utf-8" />
-    <title>Spirit Radio LW - Pro</title>
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Spirit Radio LW</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
@@ -15,7 +15,7 @@
           <div id="dial" class="dial-line paused-anim"></div>
         </div>
         <div class="frequency-labels">
-          <span>153 kHz</span><span>170</span><span>200</span><span>230</span><span>260</span><span>281 kHz</span>
+          <span>153 kHz</span><span>200</span><span>240</span><span>281 kHz</span>
         </div>
       </div>
 
@@ -24,15 +24,14 @@
       </div>
 
       <div class="analyzer-grid">
-        <div class="eq-track" data-sensor="RF"><div class="eq-container" id="eq-rf"></div></div>
-        <div class="eq-track" data-sensor="KIN"><div class="eq-container" id="eq-kin"></div></div>
-        <div class="eq-track" data-sensor="MAG"><div class="eq-container" id="eq-mag"></div></div>
-        <div class="eq-track" data-sensor="IR"><div class="eq-container" id="eq-ir"></div></div>
+        <div class="eq-track" data-label="RF"><div class="eq-container" id="eq-rf"></div></div>
+        <div class="eq-track" data-label="KIN"><div class="eq-container" id="eq-kin"></div></div>
+        <div class="eq-track" data-label="MAG"><div class="eq-container" id="eq-mag"></div></div>
+        <div class="eq-track" data-label="IR"><div class="eq-container" id="eq-ir"></div></div>
       </div>
 
       <div class="controls">
         <button id="btnToggle">Iniciar</button>
-        <button id="btnInfo" class="btn-secondary">?</button>
       </div>
 
       <audio id="staticNoise" loop><source src="static.mp3" type="audio/mpeg" /></audio>
