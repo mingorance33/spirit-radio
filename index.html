@@ -2,7 +2,7 @@
 <html lang="es">
   <head>
     <meta charset="utf-8" />
-    <title>Spirit Radio LW - Pro</title>
+    <title>Spirit Radio LW - Ultra</title>
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <link rel="stylesheet" href="style.css" />
   </head>
@@ -15,28 +15,16 @@
           <div id="dial" class="dial-line paused-anim"></div>
         </div>
         <div class="frequency-labels">
-          <span>153 kHz</span><span>200</span><span>230</span><span>281 kHz</span>
+          <span>153 kHz</span><span>210</span><span>250</span><span>281 kHz</span>
         </div>
       </div>
 
       <div class="display">
         <div class="analyzer-grid">
-          <div class="eq-track">
-            <span class="eq-label">RF</span>
-            <div class="eq-container" id="eq-rf"></div>
-          </div>
-          <div class="eq-track">
-            <span class="eq-label">KIN</span>
-            <div class="eq-container" id="eq-kin"></div>
-          </div>
-          <div class="eq-track">
-            <span class="eq-label">MAG</span>
-            <div class="eq-container" id="eq-mag"></div>
-          </div>
-          <div class="eq-track">
-            <span class="eq-label">IR</span>
-            <div class="eq-container" id="eq-ir"></div>
-          </div>
+          <div class="eq-track" data-sensor="RF"><div class="eq-container" id="eq-rf"></div></div>
+          <div class="eq-track" data-sensor="KIN"><div class="eq-container" id="eq-kin"></div></div>
+          <div class="eq-track" data-sensor="MAG"><div class="eq-container" id="eq-mag"></div></div>
+          <div class="eq-track" data-sensor="IR"><div class="eq-container" id="eq-ir"></div></div>
         </div>
         <div id="message">OFFLINE</div>
       </div>
@@ -49,10 +37,8 @@
       <div id="infoModal" class="modal">
         <div class="modal-content">
           <span class="close">&times;</span>
-          <h3>Monitoreo Multicanal</h3>
-          <div class="modal-scroll">
-            <p>Análisis de espectro en tiempo real procesando fluctuaciones electromagnéticas y cinéticas.</p>
-          </div>
+          <h3>Análisis Multiespectral</h3>
+          <p>Monitoreo de 800 puntos de datos síncronos.</p>
         </div>
       </div>
 
