@@ -25,15 +25,24 @@
       </div>
 
       <div class="display">
-        <svg class="waveform-container" viewBox="0 0 500 100" preserveAspectRatio="none">
-            <defs>
-                <path id="wave-path" d="M0,50 C150,100 350,0 500,50 L500,100 L0,100 Z" fill="none" stroke-width="2"></path>
-            </defs>
-            <use href="#wave-path" class="wave wave-radio" y="0"></use>
-            <use href="#wave-path" class="wave wave-kinetic" y="5"></use>
-            <use href="#wave-path" class="wave wave-magnetic" y="10"></use>
-            <use href="#wave-path" class="wave wave-thermal" y="15"></use>
-        </svg>
+        <div class="sensor-grid">
+          <div class="wave-track">
+            <span class="sensor-label">RF</span>
+            <svg viewBox="0 0 500 40" class="wave-svg"><path class="path-radio" d="M0,20 Q25,5 50,20 T100,20 T150,20 T200,20 T250,20 T300,20 T350,20 T400,20 T450,20 T500,20"></path></svg>
+          </div>
+          <div class="wave-track">
+            <span class="sensor-label">KIN</span>
+            <svg viewBox="0 0 500 40" class="wave-svg"><path class="path-kinetic" d="M0,20 Q25,0 50,20 T100,20 T150,20 T200,20 T250,20 T300,20 T350,20 T400,20 T450,20 T500,20"></path></svg>
+          </div>
+          <div class="wave-track">
+            <span class="sensor-label">MAG</span>
+            <svg viewBox="0 0 500 40" class="wave-svg"><path class="path-magnetic" d="M0,20 Q25,10 50,20 T100,20 T150,20 T200,20 T250,20 T300,20 T350,20 T400,20 T450,20 T500,20"></path></svg>
+          </div>
+          <div class="wave-track">
+            <span class="sensor-label">IR</span>
+            <svg viewBox="0 0 500 40" class="wave-svg"><path class="path-thermal" d="M0,20 Q25,15 50,20 T100,20 T150,20 T200,20 T250,20 T300,20 T350,20 T400,20 T450,20 T500,20"></path></svg>
+          </div>
+        </div>
         
         <div id="message">OFFLINE</div>
       </div>
@@ -48,13 +57,13 @@
           <span class="close">&times;</span>
           <h3>Protocolo de Vigilancia Espectral</h3>
           <div class="modal-scroll">
-            <p>La percepción de los sonidos paranormales se obtiene mediante el monitoreo de ondas reales del entorno:</p>
-            <p><strong style="color:#0ff;">■ Ondas de Radio (LW):</strong> El móvil localiza y analiza ondas de radio (RF) específicamente en las bandas de baja frecuencia entre 153 y 281 kHz.</p>
-            <p><strong style="color:#ffaa00;">■ Energía Cinética Sutil:</strong> Mediante los acelerómetros de alta precisión, la app detecta micro-vibraciones y variaciones en el estado de reposo del terminal.</p>
-            <p><strong style="color:#f0f;">■ Campos Magnéticos:</strong> Se integran datos de magnetómetros para detectar fluctuaciones anómalas en el entorno local.</p>
-            <p><strong style="color:#ff3333;">■ Sensores Térmicos:</strong> Análisis de variaciones infrarrojas de proximidad.</p>
+            <p>Monitoreo independiente de cuatro canales críticos:</p>
+            <p><strong style="color:#0ff;">RF (Radiofrecuencia):</strong> Escaneo de la banda LW 153-281 kHz buscando picos de modulación no identificados.</p>
+            <p><strong style="color:#ffaa00;">KIN (Energía Cinética):</strong> Registro de micro-variaciones de masa y desplazamiento sutil en el eje Z.</p>
+            <p><strong style="color:#f0f;">MAG (Magnetismo):</strong> Monitoreo de la densidad del flujo magnético ambiental.</p>
+            <p><strong style="color:#ff3333;">IR (Infrarrojo):</strong> Detección de fluctuaciones térmicas en el espectro cercano.</p>
             <hr class="modal-divider">
-            <p><strong>Protocolo de Coincidencia:</strong> Si se produce una coincidencia anormal, la aplicación muestra la última palabra aislada y la reproduce mediante el traductor interno para su análisis.</p>
+            <p><strong>Protocolo de Coincidencia:</strong> Si tres o más canales muestran actividad síncrona, el sistema extrae y procesa el EVP (Fenómeno de Voz Electrónica).</p>
           </div>
         </div>
       </div>
