@@ -13,96 +13,109 @@ body {
 }
 
 .app {
-  width: 95%; /* Aumentado un poco */
-  max-width: 500px; /* Aumentado de 450 a 500 */
-  padding: 2.5rem; /* Aumentado el padding interno */
-  background: rgba(15, 15, 25, 0.95);
+  width: 95%;
+  max-width: 480px;
+  padding: 2rem;
+  background: rgba(15, 15, 25, 0.98);
   border-radius: 20px;
-  box-shadow: 0 0 40px rgba(0, 255, 255, 0.2); /* Sombra más grande */
+  box-shadow: 0 0 40px rgba(0, 255, 255, 0.15);
   border: 1px solid #222;
 }
 
-h1 { text-align: center; margin-top: 0; margin-bottom: 2rem; letter-spacing: 0.2em; font-size: 1.2rem; text-transform: uppercase; color: #0ff; }
+h1 { text-align: center; margin-bottom: 1.5rem; letter-spacing: 0.25em; font-size: 1.1rem; text-transform: uppercase; color: #0ff; opacity: 0.8; }
 
-.radio { background: #050505; border-radius: 15px; padding: 1.5rem; border: 1px solid #1a1a1a; }
-.dial-wrapper { position: relative; height: 50px; border-radius: 8px; background: #000; overflow: hidden; border: 1px solid #222; }
-.dial-line { position: absolute; top: 0; bottom: 0; left: 0; width: 3px; background: #0ff; box-shadow: 0 0 15px #0ff; animation: dial-move 40s infinite alternate ease-in-out; }
+.radio { background: #000; border-radius: 12px; padding: 1.2rem; border: 1px solid #1a1a1a; margin-bottom: 1rem; }
+.dial-wrapper { position: relative; height: 35px; border-radius: 6px; background: #050505; overflow: hidden; border: 1px solid #222; }
+.dial-line { position: absolute; top: 0; bottom: 0; left: 0; width: 2px; background: #0ff; box-shadow: 0 0 10px #0ff; animation: dial-move 45s infinite alternate ease-in-out; }
 .paused-anim { animation-play-state: paused !important; }
-@keyframes dial-move { 0% { left: 5%; } 100% { left: 95%; } }
-.frequency-labels { display: flex; justify-content: space-between; font-size: 0.65rem; color: #444; margin-top: 0.6rem; font-family: monospace; }
 
-/* --- DISPLAY AREA MODIFICADA --- */
+@keyframes dial-move { 0% { left: 5%; } 100% { left: 95%; } }
+
+.frequency-labels { display: flex; justify-content: space-between; font-size: 0.6rem; color: #444; margin-top: 0.5rem; font-family: monospace; }
+
+/* --- NUEVA PANTALLA MULTI-ONDA --- */
 .display {
-  margin-top: 1.5rem;
-  padding: 0; /* Quitamos padding para que las ondas toquen los bordes */
-  min-height: 120px; /* Más altura para acomodar ondas y texto */
-  border-radius: 10px;
   background: #000;
-  border: 1px solid #222;
+  border: 1px solid #333;
+  border-radius: 10px;
+  padding: 10px 0;
+  min-height: 200px;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end; /* Texto abajo */
+}
+
+.sensor-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-grow: 1;
+}
+
+.wave-track {
+  display: flex;
   align-items: center;
+  height: 35px;
+  border-bottom: 1px solid #111;
+  padding: 0 10px;
   position: relative;
-  overflow: hidden; /* Importante para las ondas */
 }
 
-/* --- WAVES VISUALIZER (NUEVO) --- */
-.waveform-container {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 70%; /* Ocupan la parte superior del display */
-    opacity: 0.6;
-    pointer-events: none;
+.sensor-label {
+  font-family: monospace;
+  font-size: 0.6rem;
+  color: #555;
+  width: 30px;
+  font-weight: bold;
 }
 
-.wave {
-    fill: none;
-    stroke-dasharray: 500; /* Define el patrón de línea discontinua */
-    stroke-dashoffset: 1000;
-    animation: scrollWave infinite linear;
+.wave-svg {
+  flex-grow: 1;
+  height: 100%;
 }
 
-/* Colores y velocidades específicas para cada sensor */
-/* Radio LW: Cian, muy rápido, línea fina */
-.wave-radio { stroke: #0ff; stroke-width: 1.5; animation-duration: 3s; opacity: 0.8; }
+.wave-svg path {
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-dasharray: 50, 20; /* Crea el efecto de señal de radio */
+  animation: waveFlow infinite linear;
+}
 
-/* Cinética: Naranja/Amarillo, velocidad media, más gruesa */
-.wave-kinetic { stroke: #ffaa00; stroke-width: 2.5; animation-duration: 7s; animation-direction: reverse; opacity: 0.6; }
+/* Estilos individuales por canal */
+.path-radio { stroke: #0ff; animation-duration: 2s; stroke-width: 1; }
+.path-kinetic { stroke: #ffaa00; animation-duration: 5s; animation-direction: reverse; stroke-width: 1.5; }
+.path-magnetic { stroke: #f0f; animation-duration: 8s; stroke-width: 1.2; }
+.path-thermal { stroke: #ff3333; animation-duration: 15s; animation-direction: reverse; stroke-width: 2; opacity: 0.6; }
 
-/* Magnética: Púrpura, lenta y fluida */
-.wave-magnetic { stroke: #f0f; stroke-width: 2; animation-duration: 12s; opacity: 0.5; }
-
-/* Térmica: Roja, muy lenta, "pesada" */
-.wave-thermal { stroke: #ff3333; stroke-width: 3; animation-duration: 20s; animation-direction: reverse; opacity: 0.4; }
-
-/* Animación para simular flujo de datos */
-@keyframes scrollWave {
-    to { stroke-dashoffset: 0; }
+@keyframes waveFlow {
+  from { stroke-dashoffset: 200; }
+  to { stroke-dashoffset: 0; }
 }
 
 #message {
+  text-align: center;
   font-family: 'Courier New', Courier, monospace;
-  font-size: 1.6rem;
+  font-size: 1.5rem;
   color: #0ff;
   font-weight: bold;
-  z-index: 2; /* Asegura que el texto esté sobre las ondas */
-  padding-bottom: 15px;
-  text-shadow: 0 0 5px #000; /* Sombra para leer mejor sobre ondas */
+  padding: 15px 0;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-top: 1px solid #222;
 }
 
-.evp-active { color: #ff3333 !important; text-shadow: 0 0 20px rgba(255, 0, 0, 0.8) !important; }
+.evp-active { color: #ff3333 !important; text-shadow: 0 0 15px rgba(255, 0, 0, 0.7) !important; }
 
-/* --- RESTO DE ESTILOS --- */
-.controls { margin-top: 2rem; display: flex; justify-content: center; gap: 15px; }
-#btnToggle { padding: 1rem 2.5rem; border-radius: 50px; border: none; background: #0ff; color: #000; font-weight: bold; cursor: pointer; text-transform: uppercase; }
-.btn-secondary { width: 50px; height: 50px; border-radius: 50%; background: #1a1a2e; color: #0ff; border: 1px solid #0ff; cursor: pointer; font-size: 1.2rem; }
+/* --- CONTROLES Y MODAL --- */
+.controls { margin-top: 1.5rem; display: flex; justify-content: center; gap: 15px; }
+#btnToggle { padding: 0.8rem 2rem; border-radius: 50px; border: none; background: #0ff; color: #000; font-weight: bold; cursor: pointer; text-transform: uppercase; font-size: 0.9rem; }
+.btn-secondary { width: 45px; height: 45px; border-radius: 50%; background: #1a1a2e; color: #0ff; border: 1px solid #0ff; cursor: pointer; font-size: 1.1rem; }
+
 .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); backdrop-filter: blur(5px); }
 .modal-content { background: #0a0a14; margin: 10% auto; padding: 25px; border: 1px solid #0ff; width: 85%; max-width: 400px; border-radius: 15px; position: relative; }
-.modal-scroll { max-height: 60vh; overflow-y: auto; font-size: 0.85rem; line-height: 1.5; color: #ccc; }
-.modal-content h3 { color: #0ff; margin-top: 0; text-transform: uppercase; border-bottom: 1px solid #0ff; padding-bottom: 10px; }
-.modal-content strong { display: block; margin-top: 10px; }
+.modal-scroll { max-height: 60vh; overflow-y: auto; font-size: 0.85rem; line-height: 1.6; color: #ccc; }
+.modal-content h3 { color: #0ff; margin-top: 0; text-transform: uppercase; border-bottom: 1px solid #0ff; padding-bottom: 10px; margin-bottom: 15px; }
 .modal-divider { border: 0; border-top: 1px solid #0ff; margin: 15px 0; opacity: 0.3; }
 .close { position: absolute; right: 15px; top: 10px; font-size: 28px; color: #0ff; cursor: pointer; }
