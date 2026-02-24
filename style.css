@@ -1,62 +1,56 @@
 * { box-sizing: border-box; }
-body {
-  margin: 0; background: #000; color: #fff;
-  display: flex; justify-content: center; align-items: center; min-height: 100vh;
-  font-family: 'Courier New', monospace;
-}
+body { margin: 0; background: #000; color: #fff; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: sans-serif; }
 
-.app {
-  width: 95%; max-width: 480px; padding: 1.5rem;
-  background: #0a0a0a; border: 2px solid #222; border-radius: 15px;
-}
-
-h1 { text-align: center; color: #0ff; font-size: 1rem; letter-spacing: 4px; }
+.app { width: 98%; max-width: 550px; padding: 1.5rem; background: #050508; border: 1px solid #1a1a1a; border-radius: 10px; }
+h1 { text-align: center; color: #0ff; font-size: 0.9rem; letter-spacing: 5px; text-transform: uppercase; margin-bottom: 20px; }
 
 /* DIAL */
-.radio { background: #050505; padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #1a1a1a; }
-.dial-wrapper { position: relative; height: 30px; background: #000; overflow: hidden; border: 1px solid #333; }
-.dial-line { position: absolute; width: 2px; height: 100%; background: #0ff; animation: dial-move 40s infinite alternate ease-in-out; }
+.radio { background: #000; padding: 15px; border: 1px solid #222; margin-bottom: 10px; }
+.dial-wrapper { position: relative; height: 30px; background: #080808; border: 1px solid #333; }
+.dial-line { position: absolute; width: 2px; height: 100%; background: #0ff; box-shadow: 0 0 10px #0ff; animation: dial-move 40s infinite alternate ease-in-out; }
 .paused-anim { animation-play-state: paused !important; }
-@keyframes dial-move { 0% { left: 2%; } 100% { left: 98%; } }
+@keyframes dial-move { 0% { left: 0%; } 100% { left: calc(100% - 2px); } }
 
-/* ANALIZADOR */
-.display {
-  background: #000; border: 1px solid #333; border-radius: 5px; padding: 10px;
-}
+/* ANALIZADOR DE 200 BARRAS */
+.display { background: #000; border: 1px solid #222; padding: 5px; }
+.analyzer-grid { display: flex; flex-direction: column; gap: 4px; }
 
-.analyzer-grid { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
-
-.eq-track { display: flex; align-items: center; gap: 10px; height: 30px; }
-.eq-label { font-size: 0.6rem; color: #0ff; width: 25px; font-weight: bold; }
+.eq-track { display: flex; flex-direction: column; position: relative; }
+.eq-track::before { content: attr(data-sensor); position: absolute; left: 5px; top: 2px; font-size: 10px; color: rgba(0,255,255,0.5); z-index: 5; font-family: monospace; }
 
 .eq-container {
-  flex-grow: 1; height: 100%; display: flex; align-items: flex-end; gap: 2px;
+  display: flex;
+  align-items: flex-end;
+  height: 40px; /* Altura de cada bloque de ecualizador */
+  width: 100%;
+  gap: 1px;
+  overflow: hidden;
+  border-bottom: 1px solid #111;
 }
 
-/* Las barras individuales */
 .bar {
-  flex-grow: 1;
-  width: 4px;
-  /* Gradación de color: Verde abajo, Amarillo medio, Rojo arriba */
-  background: linear-gradient(to top, #00ff00, #ffff00, #ff0000);
-  height: 10%; /* Empiezan bajas */
-  transition: height 0.1s ease;
+  flex: 1;
+  height: 5%;
+  min-width: 1px;
+  transition: height 0.08s ease;
 }
+
+/* GRADACIONES DE COLOR POR SENSOR (Izquierda a Derecha) */
+/* RF: Cian a Blanco */
+#eq-rf .bar { background: linear-gradient(to top, #004444, #00ffff); opacity: 0.8; }
+/* KIN: Púrpura a Rosa */
+#eq-kin .bar { background: linear-gradient(to top, #440044, #ff00ff); opacity: 0.8; }
+/* MAG: Azul a Rojo */
+#eq-mag .bar { background: linear-gradient(to top, #000044, #ff3300); opacity: 0.8; }
+/* IR: Verde a Amarillo */
+#eq-ir .bar { background: linear-gradient(to top, #004400, #ffff00); opacity: 0.8; }
 
 #message {
-  text-align: center; font-size: 1.2rem; color: #0ff; font-weight: bold;
-  height: 40px; display: flex; align-items: center; justify-content: center;
-  border-top: 1px solid #222; margin-top: 5px;
+  text-align: center; font-size: 1.4rem; color: #0ff; font-family: monospace;
+  height: 50px; display: flex; align-items: center; justify-content: center;
 }
+.evp-active { color: #f33 !important; text-shadow: 0 0 15px #f00; }
 
-.evp-active { color: #f00 !important; text-shadow: 0 0 10px #f00; }
-
-/* CONTROLES */
 .controls { display: flex; justify-content: center; gap: 10px; margin-top: 15px; }
-#btnToggle { padding: 10px 30px; border-radius: 20px; border: none; background: #0ff; font-weight: bold; cursor: pointer; }
-.btn-secondary { width: 40px; border-radius: 50%; background: none; border: 1px solid #0ff; color: #0ff; cursor: pointer; }
-
-/* MODAL */
-.modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10; }
-.modal-content { background: #111; margin: 20% auto; padding: 20px; width: 80%; border: 1px solid #0ff; border-radius: 10px; }
-.close { float: right; font-size: 20px; cursor: pointer; color: #0ff; }
+#btnToggle { padding: 12px 40px; border-radius: 5px; border: 1px solid #0ff; background: transparent; color: #0ff; cursor: pointer; font-weight: bold; }
+.btn-secondary { width: 45px; height: 45px; border-radius: 5px; background: #111; border: 1px solid #333; color: #555; cursor: pointer; }
