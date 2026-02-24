@@ -85,7 +85,7 @@ h1 {
 
 #message {
   font-family: 'Courier New', Courier, monospace;
-  font-size: 1.8rem;
+  font-size: 1.6rem;
   color: #0ff;
   font-weight: bold;
 }
@@ -142,7 +142,7 @@ h1 {
   position: relative;
 }
 
-.modal-scroll { max-height: 60vh; overflow-y: auto; font-size: 0.9rem; line-height: 1.5; color: #ccc; }
+.modal-scroll { max-height: 60vh; overflow-y: auto; font-size: 0.85rem; line-height: 1.5; color: #ccc; }
 .modal-content h3 { color: #0ff; margin-top: 0; text-transform: uppercase; border-bottom: 1px solid #0ff; padding-bottom: 10px; }
 .modal-content strong { color: #0ff; display: block; margin-top: 10px; }
 .modal-divider { border: 0; border-top: 1px solid #0ff; margin: 15px 0; opacity: 0.3; }
