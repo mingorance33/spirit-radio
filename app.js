@@ -1,103 +1,115 @@
 let running = false;
 const msgEl = document.getElementById("message");
 const btnToggle = document.getElementById("btnToggle");
-const dialEl = document.getElementById("dial");
 const staticNoise = document.getElementById("staticNoise");
 const radioBank = document.getElementById("radioBank");
+const dialEl = document.getElementById("dial");
+const dialWrapper = document.querySelector(".dial-wrapper");
 
+let radioTimerId = null;
+let paranormalTimerId = null;
+let displayUpdateId = null;
 let phrases = [];
-let audioIntervals = []; // Para limpiar todos los audios al parar
+let currentUtterance = null; // Referencia global para evitar que el móvil la borre
 
-// 1. Generar 200 barras por canal
-const trackIds = ['eq-rf', 'eq-kin', 'eq-mag', 'eq-ir'];
-trackIds.forEach(id => {
-  const container = document.getElementById(id);
-  for (let i = 0; i < 200; i++) {
-    const bar = document.createElement('div');
-    bar.className = 'bar';
-    bar.style.opacity = i < 40 ? i/40 : (i > 160 ? (200-i)/40 : 1);
-    container.appendChild(bar);
-  }
-});
+fetch('phrases.json')
+  .then(response => response.json())
+  .then(data => phrases = data.phrases);
 
-fetch('phrases.json').then(res => res.json()).then(data => phrases = data.phrases);
+function updateFrequencyDisplay() {
+  // CRÍTICO: Si el mensaje está en rojo (hablando), NO actualizamos los kHz
+  if (!dialEl || !dialWrapper || !running || msgEl.classList.contains('evp-active')) return;
 
-function animateBars() {
-  if (!running) return;
-  trackIds.forEach((id, tIdx) => {
-    const bars = document.querySelectorAll(`#${id} .bar`);
-    const time = Date.now() * 0.001;
-    bars.forEach((bar, i) => {
-      // Movimiento independiente por canal (tIdx)
-      const freq = 0.2 + (tIdx * 0.1);
-      const h = Math.sin(time * freq + i * 0.1) * 40 + 50 + (Math.random() * 20);
-      bar.style.height = Math.max(10, Math.min(100, h)) + "%";
-    });
-  });
-  requestAnimationFrame(animateBars);
+  const dialRect = dialEl.getBoundingClientRect();
+  const wrapperRect = dialWrapper.getBoundingClientRect();
+  const offset = dialRect.left - wrapperRect.left;
+  const width = wrapperRect.width - dialRect.width;
+  let percent = offset / width;
+  percent = Math.max(0, Math.min(1, percent));
+  
+  const currentFreq = (153.000 + (percent * 128.000)).toFixed(3);
+  msgEl.textContent = `${currentFreq} kHz`;
 }
 
-function speakParanormal() {
-  if (!running || phrases.length === 0) return;
+function speakTetric(text) {
+  // Cancelamos cualquier voz anterior para que no se amontonen en el móvil
   window.speechSynthesis.cancel();
-  const text = phrases[Math.floor(Math.random() * phrases.length)];
-  const ut = new SpeechSynthesisUtterance(text);
-  ut.lang = 'es-ES'; ut.pitch = 0.3; ut.rate = 0.6;
+
+  currentUtterance = new SpeechSynthesisUtterance(text);
+  currentUtterance.lang = 'es-ES';
+  currentUtterance.pitch = 0.4;
+  currentUtterance.rate = 0.7;
+  
+  // Primero aplicamos el estado visual
   msgEl.classList.add('evp-active');
   msgEl.textContent = text.toUpperCase();
-  ut.onend = () => { if(running) msgEl.classList.remove('evp-active'); };
-  window.speechSynthesis.speak(ut);
+  
+  // Evento cuando termina de hablar
+  currentUtterance.onend = () => {
+    msgEl.classList.remove('evp-active');
+  };
+
+  // Por si hay errores en el motor de voz del móvil
+  currentUtterance.onerror = () => {
+    msgEl.classList.remove('evp-active');
+  };
+
+  window.speechSynthesis.speak(currentUtterance);
 }
 
-function playRadioSlice() {
-  if (!running) return;
+function playRandomRadioSlice() {
+  if (!radioBank.duration) return;
   radioBank.currentTime = Math.random() * (radioBank.duration - 2);
-  radioBank.volume = 0.3;
+  radioBank.volume = 0.4;
   radioBank.play().catch(()=>{});
-  setTimeout(() => { if(running) radioBank.pause(); }, 2000);
+  setTimeout(() => { if (running) radioBank.pause(); }, 2000);
 }
 
-function start() {
+function startRadio() {
   running = true;
-  btnToggle.textContent = "DETENER";
+  btnToggle.textContent = "Detener";
   dialEl.classList.remove('paused-anim');
-  staticNoise.play().catch(()=>{});
   
-  animateBars();
+  displayUpdateId = setInterval(updateFrequencyDisplay, 50);
+  staticNoise.volume = 0.15;
+  staticNoise.play().catch(() => {});
   
-  // kHz Update
-  audioIntervals.push(setInterval(() => {
-    if (!msgEl.classList.contains('evp-active')) {
-      const pos = dialEl.offsetLeft / dialEl.parentElement.offsetWidth;
-      msgEl.textContent = (153 + pos * 128).toFixed(3) + " kHz";
+  playRandomRadioSlice();
+  radioTimerId = setInterval(() => { if (running) playRandomRadioSlice(); }, 15000);
+  
+  paranormalTimerId = setInterval(() => {
+    if (running && phrases.length > 0) {
+      speakTetric(phrases[Math.floor(Math.random() * phrases.length)]);
     }
-  }, 50));
-
-  // Radio slices cada 12s
-  audioIntervals.push(setInterval(playRadioSlice, 12000));
-  
-  // Voces cada 20s
-  audioIntervals.push(setInterval(speakParanormal, 20000));
-  
-  playRadioSlice(); // Primera vez
+  }, 25000);
 }
 
-function stop() {
+function stopRadio() {
   running = false;
-  btnToggle.textContent = "INICIAR";
+  btnToggle.textContent = "Iniciar";
   dialEl.classList.add('paused-anim');
+  clearInterval(displayUpdateId);
+  clearInterval(radioTimerId);
+  clearInterval(paranormalTimerId);
   staticNoise.pause();
   radioBank.pause();
   window.speechSynthesis.cancel();
-  audioIntervals.forEach(clearInterval);
-  audioIntervals = [];
   msgEl.textContent = "OFFLINE";
   msgEl.classList.remove('evp-active');
-  document.querySelectorAll('.bar').forEach(b => b.style.height = "10%");
 }
 
-btnToggle.onclick = () => {
-  // Desbloqueo de audio para móvil
-  window.speechSynthesis.speak(new SpeechSynthesisUtterance(""));
-  running ? stop() : start();
-};
+btnToggle.addEventListener("click", () => {
+  // DESBLOQUEO DE VOZ (Truco para móviles)
+  const unlock = new SpeechSynthesisUtterance("");
+  window.speechSynthesis.speak(unlock);
+
+  if (running) stopRadio(); else startRadio();
+});
+
+// Modal
+const modal = document.getElementById("infoModal");
+const btnInfo = document.getElementById("btnInfo");
+const spanClose = document.querySelector(".close");
+btnInfo.onclick = () => modal.style.display = "block";
+spanClose.onclick = () => modal.style.display = "none";
+window.onclick = (e) => { if (e.target == modal) modal.style.display = "none"; };
