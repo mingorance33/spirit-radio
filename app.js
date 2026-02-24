@@ -11,7 +11,7 @@ let paranormalTimerId = null;
 let displayUpdateId = null;
 let phrases = [];
 
-// Variables para el panel visual
+// Visual variables
 const visualModal = document.getElementById("visualModal");
 const btnVisual = document.getElementById("btnVisual");
 const btnCloseVisual = document.getElementById("closeVisual");
@@ -22,7 +22,7 @@ fetch('phrases.json')
   .then(response => response.json())
   .then(data => phrases = data.phrases);
 
-// Generar 200 barras por canal al cargar
+// Crear las 200 barras
 trackIds.forEach(id => {
   const container = document.getElementById(id);
   if (container) {
@@ -37,14 +37,11 @@ trackIds.forEach(id => {
 
 function updateFrequencyDisplay() {
   if (!dialEl || !dialWrapper || !running || msgEl.classList.contains('evp-active')) return;
-
   const dialRect = dialEl.getBoundingClientRect();
   const wrapperRect = dialWrapper.getBoundingClientRect();
   const offset = dialRect.left - wrapperRect.left;
   const width = wrapperRect.width - dialRect.width;
-  let percent = offset / width;
-  percent = Math.max(0, Math.min(1, percent));
-  
+  let percent = Math.max(0, Math.min(1, offset / width));
   const currentFreq = (153.000 + (percent * 128.000)).toFixed(3);
   msgEl.textContent = `${currentFreq} kHz`;
   if (modalFreq) modalFreq.textContent = `${currentFreq} kHz`;
@@ -55,7 +52,6 @@ function animateSensors() {
     document.querySelectorAll('.bar').forEach(b => b.style.height = "5%");
     return;
   }
-
   trackIds.forEach((id, tIdx) => {
     const bars = document.querySelectorAll(`#${id} .bar`);
     const time = Date.now() * 0.001;
@@ -65,22 +61,29 @@ function animateSensors() {
       bar.style.height = h + "%";
     });
   });
-
   requestAnimationFrame(animateSensors);
 }
 
+// CORRECCIÓN VOZ: Forzamos la limpieza y recreación del objeto
 function speakTetric(text) {
-  window.speechSynthesis.cancel();
+  if (!running) return;
+  window.speechSynthesis.cancel(); // Parar cualquier voz anterior
+  
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = 'es-ES';
   utterance.pitch = 0.4;
   utterance.rate = 0.7;
-  
+  utterance.volume = 1.0;
+
   msgEl.classList.add('evp-active');
   msgEl.textContent = text.toUpperCase();
-  
+
   utterance.onend = () => { if (running) msgEl.classList.remove('evp-active'); };
-  window.speechSynthesis.speak(utterance);
+  
+  // Pequeño retardo para asegurar que el navegador procese el cancel() anterior
+  setTimeout(() => {
+    window.speechSynthesis.speak(utterance);
+  }, 100);
 }
 
 function playRandomRadioSlice() {
@@ -126,19 +129,12 @@ function stopRadio() {
 }
 
 btnToggle.addEventListener("click", () => {
-  const unlock = new SpeechSynthesisUtterance("");
+  // DESBLOQUEO CRÍTICO: Una frase vacía al hacer click real activa el audio en iOS/Android
+  const unlock = new SpeechSynthesisUtterance(" ");
   window.speechSynthesis.speak(unlock);
+
   if (running) stopRadio(); else startRadio();
 });
 
 btnVisual.onclick = () => { visualModal.style.display = "flex"; };
 btnCloseVisual.onclick = () => { visualModal.style.display = "none"; };
-
-// Modal Info
-const modal = document.getElementById("infoModal");
-const btnInfo = document.getElementById("btnInfo");
-const spanClose = document.querySelector(".close");
-
-btnInfo.onclick = () => modal.style.display = "block";
-spanClose.onclick = () => modal.style.display = "none";
-window.onclick = (event) => { if (event.target == modal) modal.style.display = "none"; };
