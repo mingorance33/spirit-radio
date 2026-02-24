@@ -25,19 +25,36 @@
       </div>
 
       <div class="display">
-        <div id="message"></div>
+        <div id="message">SINTONIZANDO...</div>
       </div>
 
       <div class="controls">
         <button id="btnToggle">Iniciar</button>
+        <button id="btnInfo" class="btn-secondary">?</button>
       </div>
 
-      <!-- Ruido estático ambiente -->
+      <div id="infoModal" class="modal">
+        <div class="modal-content">
+          <span class="close">&times;</span>
+          <h3>Análisis de Ondas y Sensores</h3>
+          <div class="modal-scroll">
+            <p>La percepción de los sonidos paranormales se obtiene mediante el monitoreo de ondas reales del entorno:</p>
+            
+            <p><strong>Ondas Electromagnéticas:</strong> El dispositivo localiza ondas de radio (RF) en bandas de 900-2000 MHz (GSM/4G) y hasta 80 GHz (5G) mediante antenas MIMO. Estas miden la intensidad de RF ambiental y detectan fluctuaciones no explicadas.</p>
+            
+            <p><strong>Ondas Sísmicas:</strong> Los acelerómetros detectan ondas P (primarias) y vibraciones sutiles imperceptibles para el humano. La red de sismógrafos del sistema procesa estos datos en tiempo real.</p>
+            
+            <p><strong>Detección de Coincidencias:</strong> Si se produce una coincidencia anómala en varias de estas ondas simultáneamente, la aplicación aísla la última palabra captada en las frecuencias de radio y la reproduce mediante el sintetizador de voz interno para asegurar su claridad.</p>
+            
+            <p><strong>Otros Sensores:</strong> Se utilizan magnetómetros para campos magnéticos, giroscopios para ondas de movimiento y sensores infrarrojos para variaciones térmicas de proximidad.</p>
+          </div>
+        </div>
+      </div>
+
       <audio id="staticNoise" loop>
         <source src="static.mp3" type="audio/mpeg" />
       </audio>
 
-      <!-- Banco de radio que sonará a trozos aleatorios -->
       <audio id="radioBank">
         <source src="radio.mp3" type="audio/mpeg" />
       </audio>
