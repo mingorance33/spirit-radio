@@ -1,56 +1,96 @@
 * { box-sizing: border-box; }
-body { margin: 0; background: #000; color: #fff; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: sans-serif; }
+body {
+  margin: 0;
+  background: radial-gradient(circle, #0f172a 0%, #000 100%);
+  color: #fff;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  font-family: 'Segoe UI', sans-serif;
+}
 
-.app { width: 98%; max-width: 550px; padding: 1.5rem; background: #050508; border: 1px solid #1a1a1a; border-radius: 10px; }
-h1 { text-align: center; color: #0ff; font-size: 0.9rem; letter-spacing: 5px; text-transform: uppercase; margin-bottom: 20px; }
+.app {
+  width: 95%;
+  max-width: 500px;
+  padding: 2rem;
+  background: #0a0a0f;
+  border-radius: 24px;
+  border: 1px solid #1e293b;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+}
+
+h1 { text-align: center; color: #7cfcff; letter-spacing: 0.3em; font-size: 1.1rem; margin-bottom: 1.5rem; text-transform: uppercase; }
 
 /* DIAL */
-.radio { background: #000; padding: 15px; border: 1px solid #222; margin-bottom: 10px; }
-.dial-wrapper { position: relative; height: 30px; background: #080808; border: 1px solid #333; }
-.dial-line { position: absolute; width: 2px; height: 100%; background: #0ff; box-shadow: 0 0 10px #0ff; animation: dial-move 40s infinite alternate ease-in-out; }
+.radio { background: #050505; padding: 15px; border-radius: 12px; border: 1px solid #1a1a1a; margin-bottom: 1rem; }
+.dial-wrapper { position: relative; height: 40px; background: #000; border: 1px solid #222; border-radius: 4px; overflow: hidden; }
+.dial-line { position: absolute; width: 3px; height: 100%; background: #0ff; box-shadow: 0 0 15px #0ff; animation: dial-move 45s infinite alternate ease-in-out; }
 .paused-anim { animation-play-state: paused !important; }
-@keyframes dial-move { 0% { left: 0%; } 100% { left: calc(100% - 2px); } }
+@keyframes dial-move { 0% { left: 2%; } 100% { left: 97%; } }
+.frequency-labels { display: flex; justify-content: space-between; font-size: 0.65rem; color: #475569; margin-top: 8px; font-family: monospace; }
 
-/* ANALIZADOR DE 200 BARRAS */
-.display { background: #000; border: 1px solid #222; padding: 5px; }
-.analyzer-grid { display: flex; flex-direction: column; gap: 4px; }
+/* DISPLAY MENSAJE */
+.display {
+  background: #000;
+  border-radius: 12px;
+  height: 80px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border: 1px solid #1e293b;
+  margin-bottom: 1.5rem;
+}
+#message { font-family: 'Courier New', monospace; font-size: 1.8rem; color: #7cfcff; font-weight: bold; }
 
-.eq-track { display: flex; flex-direction: column; position: relative; }
-.eq-track::before { content: attr(data-sensor); position: absolute; left: 5px; top: 2px; font-size: 10px; color: rgba(0,255,255,0.5); z-index: 5; font-family: monospace; }
-
+/* ANALIZADOR DE BARRAS */
+.analyzer-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 2rem;
+  padding: 10px;
+  background: rgba(0,0,0,0.3);
+  border-radius: 8px;
+}
 .eq-container {
   display: flex;
   align-items: flex-end;
-  height: 40px; /* Altura de cada bloque de ecualizador */
-  width: 100%;
+  height: 35px;
   gap: 1px;
-  overflow: hidden;
-  border-bottom: 1px solid #111;
 }
-
 .bar {
   flex: 1;
-  height: 5%;
+  height: 10%;
   min-width: 1px;
-  transition: height 0.08s ease;
+  transition: height 0.1s ease;
 }
 
-/* GRADACIONES DE COLOR POR SENSOR (Izquierda a Derecha) */
-/* RF: Cian a Blanco */
-#eq-rf .bar { background: linear-gradient(to top, #004444, #00ffff); opacity: 0.8; }
-/* KIN: Púrpura a Rosa */
-#eq-kin .bar { background: linear-gradient(to top, #440044, #ff00ff); opacity: 0.8; }
-/* MAG: Azul a Rojo */
-#eq-mag .bar { background: linear-gradient(to top, #000044, #ff3300); opacity: 0.8; }
-/* IR: Verde a Amarillo */
-#eq-ir .bar { background: linear-gradient(to top, #004400, #ffff00); opacity: 0.8; }
+/* GRADACIONES VERTICALES POR CANAL (Glow Effect) */
+#eq-rf .bar { background: linear-gradient(to top, #ff4e50, #f9d423); } /* Fuego */
+#eq-kin .bar { background: linear-gradient(to top, #8e2de2, #4a00e0); } /* Púrpura */
+#eq-mag .bar { background: linear-gradient(to top, #00c6ff, #0072ff); } /* Azul */
+#eq-ir .bar { background: linear-gradient(to top, #00f260, #0575e6); } /* Esmeralda */
 
-#message {
-  text-align: center; font-size: 1.4rem; color: #0ff; font-family: monospace;
-  height: 50px; display: flex; align-items: center; justify-content: center;
+/* CONTROLES */
+.controls { display: flex; justify-content: center; align-items: center; gap: 20px; }
+#btnToggle {
+  background: #7cfcff;
+  color: #000;
+  border: none;
+  padding: 12px 45px;
+  border-radius: 30px;
+  font-weight: bold;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 0 0 20px rgba(124, 252, 255, 0.4);
 }
-.evp-active { color: #f33 !important; text-shadow: 0 0 15px #f00; }
-
-.controls { display: flex; justify-content: center; gap: 10px; margin-top: 15px; }
-#btnToggle { padding: 12px 40px; border-radius: 5px; border: 1px solid #0ff; background: transparent; color: #0ff; cursor: pointer; font-weight: bold; }
-.btn-secondary { width: 45px; height: 45px; border-radius: 5px; background: #111; border: 1px solid #333; color: #555; cursor: pointer; }
+.btn-secondary {
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  border: 1px solid #7cfcff;
+  background: transparent;
+  color: #7cfcff;
+  cursor: pointer;
+}
