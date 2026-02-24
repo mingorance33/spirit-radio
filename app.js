@@ -1,78 +1,103 @@
 let running = false;
-const trackIds = ['eq-rf', 'eq-kin', 'eq-mag', 'eq-ir'];
-const numBars = 200; // 200 barras por fila
+const msgEl = document.getElementById("message");
+const btnToggle = document.getElementById("btnToggle");
+const dialEl = document.getElementById("dial");
+const staticNoise = document.getElementById("staticNoise");
+const radioBank = document.getElementById("radioBank");
 
-// 1. Generar barras y aplicar gradación horizontal de opacidad
+let phrases = [];
+let audioIntervals = []; // Para limpiar todos los audios al parar
+
+// 1. Generar 200 barras por canal
+const trackIds = ['eq-rf', 'eq-kin', 'eq-mag', 'eq-ir'];
 trackIds.forEach(id => {
-    const container = document.getElementById(id);
-    for (let i = 0; i < numBars; i++) {
-        const bar = document.createElement('div');
-        bar.className = 'bar';
-        // Gradación de opacidad para que los bordes sean más suaves
-        const opacity = i < 40 ? i / 40 : (i > 160 ? (200 - i) / 40 : 1);
-        bar.style.opacity = opacity;
-        container.appendChild(bar);
-    }
+  const container = document.getElementById(id);
+  for (let i = 0; i < 200; i++) {
+    const bar = document.createElement('div');
+    bar.className = 'bar';
+    bar.style.opacity = i < 40 ? i/40 : (i > 160 ? (200-i)/40 : 1);
+    container.appendChild(bar);
+  }
 });
 
-function animate() {
-    if (!running) return;
+fetch('phrases.json').then(res => res.json()).then(data => phrases = data.phrases);
 
-    trackIds.forEach((id, trackIndex) => {
-        const bars = document.querySelectorAll(`#${id} .bar`);
-        const time = Date.now() * 0.002;
-        
-        bars.forEach((bar, i) => {
-            // Cada track tiene un multiplicador de velocidad diferente (trackIndex)
-            // Esto hace que NO vayan al mismo ritmo.
-            const speed = 0.1 + (trackIndex * 0.05);
-            const noise = Math.sin(time * speed + i * 0.2) * 20;
-            const randomJump = Math.random() * 30;
-            
-            // Calculamos la altura base + variación
-            let h = 30 + noise + randomJump;
-            h = Math.max(10, Math.min(100, h));
-            
-            bar.style.height = h + "%";
-        });
+function animateBars() {
+  if (!running) return;
+  trackIds.forEach((id, tIdx) => {
+    const bars = document.querySelectorAll(`#${id} .bar`);
+    const time = Date.now() * 0.001;
+    bars.forEach((bar, i) => {
+      // Movimiento independiente por canal (tIdx)
+      const freq = 0.2 + (tIdx * 0.1);
+      const h = Math.sin(time * freq + i * 0.1) * 40 + 50 + (Math.random() * 20);
+      bar.style.height = Math.max(10, Math.min(100, h)) + "%";
     });
-    
-    requestAnimationFrame(animate);
+  });
+  requestAnimationFrame(animateBars);
 }
 
-// Controladores de inicio/parada
-const btnToggle = document.getElementById("btnToggle");
-const dial = document.getElementById("dial");
-const msg = document.getElementById("message");
+function speakParanormal() {
+  if (!running || phrases.length === 0) return;
+  window.speechSynthesis.cancel();
+  const text = phrases[Math.floor(Math.random() * phrases.length)];
+  const ut = new SpeechSynthesisUtterance(text);
+  ut.lang = 'es-ES'; ut.pitch = 0.3; ut.rate = 0.6;
+  msgEl.classList.add('evp-active');
+  msgEl.textContent = text.toUpperCase();
+  ut.onend = () => { if(running) msgEl.classList.remove('evp-active'); };
+  window.speechSynthesis.speak(ut);
+}
+
+function playRadioSlice() {
+  if (!running) return;
+  radioBank.currentTime = Math.random() * (radioBank.duration - 2);
+  radioBank.volume = 0.3;
+  radioBank.play().catch(()=>{});
+  setTimeout(() => { if(running) radioBank.pause(); }, 2000);
+}
+
+function start() {
+  running = true;
+  btnToggle.textContent = "DETENER";
+  dialEl.classList.remove('paused-anim');
+  staticNoise.play().catch(()=>{});
+  
+  animateBars();
+  
+  // kHz Update
+  audioIntervals.push(setInterval(() => {
+    if (!msgEl.classList.contains('evp-active')) {
+      const pos = dialEl.offsetLeft / dialEl.parentElement.offsetWidth;
+      msgEl.textContent = (153 + pos * 128).toFixed(3) + " kHz";
+    }
+  }, 50));
+
+  // Radio slices cada 12s
+  audioIntervals.push(setInterval(playRadioSlice, 12000));
+  
+  // Voces cada 20s
+  audioIntervals.push(setInterval(speakParanormal, 20000));
+  
+  playRadioSlice(); // Primera vez
+}
+
+function stop() {
+  running = false;
+  btnToggle.textContent = "INICIAR";
+  dialEl.classList.add('paused-anim');
+  staticNoise.pause();
+  radioBank.pause();
+  window.speechSynthesis.cancel();
+  audioIntervals.forEach(clearInterval);
+  audioIntervals = [];
+  msgEl.textContent = "OFFLINE";
+  msgEl.classList.remove('evp-active');
+  document.querySelectorAll('.bar').forEach(b => b.style.height = "10%");
+}
 
 btnToggle.onclick = () => {
-    if (!running) {
-        running = true;
-        btnToggle.textContent = "DETENER";
-        dial.classList.remove("paused-anim");
-        msg.textContent = "BUSCANDO...";
-        animate();
-        // Simulación de audio
-        document.getElementById("staticNoise").play();
-    } else {
-        running = false;
-        btnToggle.textContent = "INICIAR";
-        dial.classList.add("paused-anim");
-        msg.textContent = "OFFLINE";
-        document.getElementById("staticNoise").pause();
-        // Resetear barras
-        document.querySelectorAll('.bar').forEach(b => b.style.height = "10%");
-    }
+  // Desbloqueo de audio para móvil
+  window.speechSynthesis.speak(new SpeechSynthesisUtterance(""));
+  running ? stop() : start();
 };
-
-// Lógica de kHz (Basada en la posición real del dial)
-setInterval(() => {
-    if (running) {
-        const parentWidth = dial.parentElement.offsetWidth;
-        const currentLeft = dial.offsetLeft;
-        const freq = (153 + (currentLeft / parentWidth) * 128).toFixed(3);
-        if (!msg.classList.contains('evp-active')) {
-            msg.textContent = freq + " kHz";
-        }
-    }
-}, 50);
