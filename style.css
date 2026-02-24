@@ -1,4 +1,3 @@
-/* --- ESTILOS BASE --- */
 * { box-sizing: border-box; }
 
 body {
@@ -33,7 +32,6 @@ h1 {
   color: #0ff;
 }
 
-/* --- RADIO Y DIAL --- */
 .radio { background: #050505; border-radius: 15px; padding: 1.5rem; border: 1px solid #1a1a1a; }
 
 .dial-wrapper {
@@ -54,6 +52,7 @@ h1 {
   animation: dial-move 40s infinite alternate ease-in-out;
 }
 
+/* Esta es la clase clave para el fallo que mencionas */
 .paused-anim { animation-play-state: paused !important; }
 
 @keyframes dial-move {
@@ -70,7 +69,6 @@ h1 {
   font-family: monospace;
 }
 
-/* --- DISPLAY --- */
 .display {
   margin-top: 1.5rem;
   padding: 1.2rem;
@@ -95,7 +93,6 @@ h1 {
   text-shadow: 0 0 20px rgba(255, 0, 0, 0.8) !important;
 }
 
-/* --- CONTROLES --- */
 .controls { margin-top: 2rem; display: flex; justify-content: center; gap: 15px; }
 
 #btnToggle {
@@ -120,7 +117,6 @@ h1 {
   font-size: 1.2rem;
 }
 
-/* --- MODAL --- */
 .modal {
   display: none;
   position: fixed;
