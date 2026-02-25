@@ -12,7 +12,7 @@ let paranormalTimerId = null;
 let displayUpdateId = null;
 let phrases = [];
 
-// --- ANALIZADOR DE AUDIO ---
+// --- SISTEMA DE AUDIO Y ANÁLISIS ---
 let visualWindow = null;
 let audioCtx, analyser, dataArray;
 
@@ -21,7 +21,7 @@ function initAudioAnalysis() {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         analyser = audioCtx.createAnalyser();
         
-        // Conectar audios al analizador sin interrumpir la salida
+        // Conexión de nodos
         const sourceStatic = audioCtx.createMediaElementSource(staticNoise);
         const sourceRadio = audioCtx.createMediaElementSource(radioBank);
         
@@ -29,7 +29,7 @@ function initAudioAnalysis() {
         sourceRadio.connect(analyser);
         analyser.connect(audioCtx.destination);
         
-        analyser.fftSize = 64;
+        analyser.fftSize = 256; 
         dataArray = new Uint8Array(analyser.frequencyBinCount);
     }
 }
@@ -37,12 +37,23 @@ function initAudioAnalysis() {
 function sendDataToVisualizer() {
     if (visualWindow && !visualWindow.closed && running) {
         analyser.getByteFrequencyData(dataArray);
-        const volume = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
-        visualWindow.postMessage({ type: 'AUDIO_UPDATE', volume: volume }, '*');
+        
+        // Calculamos el volumen real (0 a 255)
+        let total = 0;
+        for(let i = 0; i < dataArray.length; i++) {
+            total += dataArray[i];
+        }
+        let volume = total / dataArray.length;
+        
+        // Enviamos el volumen multiplicado por 2 para dar más sensibilidad
+        visualWindow.postMessage({ 
+            type: 'AUDIO_UPDATE', 
+            volume: volume * 2 
+        }, '*');
     }
 }
 
-// --- FUNCIONES DE LA RADIO ---
+// --- FUNCIONES ORIGINALES ---
 fetch('phrases.json').then(res => res.json()).then(data => phrases = data.phrases);
 
 function updateFrequencyDisplay() {
@@ -51,6 +62,8 @@ function updateFrequencyDisplay() {
     const wrapperRect = dialWrapper.getBoundingClientRect();
     const percent = Math.max(0, Math.min(1, (dialRect.left - wrapperRect.left) / (wrapperRect.width - dialRect.width)));
     msgEl.textContent = `${(153.000 + (percent * 128.000)).toFixed(3)} kHz`;
+    
+    // MANDAR DATOS CONSTANTEMENTE
     sendDataToVisualizer();
 }
 
@@ -68,18 +81,21 @@ function speakTetric(text) {
 function playRandomRadioSlice() {
     if (!running) return;
     radioBank.currentTime = Math.random() * (radioBank.duration || 10);
-    radioBank.volume = 0.5;
+    radioBank.volume = 0.8; // Subimos volumen para que el visualizador lo note más
     radioBank.play().catch(() => {});
-    setTimeout(() => { if (running) radioBank.pause(); }, 600 + Math.random() * 1000);
+    setTimeout(() => { if (running) radioBank.pause(); }, 700 + Math.random() * 1000);
 }
 
 function startRadio() {
     initAudioAnalysis();
     if (audioCtx.state === 'suspended') audioCtx.resume();
+    
     running = true;
     btnToggle.textContent = "Detener";
     dialEl.classList.remove('paused-anim');
     displayUpdateId = setInterval(updateFrequencyDisplay, 50);
+    
+    staticNoise.volume = 0.2;
     staticNoise.play();
     
     radioTimerId = setInterval(playRandomRadioSlice, 12000);
@@ -99,11 +115,10 @@ function stopRadio() {
     radioBank.pause();
     window.speechSynthesis.cancel();
     msgEl.textContent = "OFFLINE";
+    msgEl.classList.remove('evp-active');
 }
 
-// --- EVENTOS ---
 btnToggle.onclick = () => {
-    window.speechSynthesis.speak(new SpeechSynthesisUtterance("")); // Unlock audio
     if (running) stopRadio(); else startRadio();
 };
 
@@ -111,7 +126,7 @@ btnVisualizer.onclick = () => {
     visualWindow = window.open('visualizer.html', 'SpiritVisualizer', 'width=500,height=600');
 };
 
-// Modal de Ayuda (Corregido)
+// Modal Ayuda
 const modal = document.getElementById("infoModal");
 document.getElementById("btnInfo").onclick = () => modal.style.display = "block";
 document.querySelector(".close").onclick = () => modal.style.display = "none";
