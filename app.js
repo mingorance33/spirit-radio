@@ -11,8 +11,9 @@ let radioTimerId = null;
 let paranormalTimerId = null;
 let displayUpdateId = null;
 let phrases = [];
+let isSpeaking = false; // Nueva variable para rastrear la voz paranormal
 
-// --- SISTEMA DE AUDIO Y ANÁLISIS ---
+// --- SISTEMA DE AUDIO ---
 let visualWindow = null;
 let audioCtx, analyser, dataArray;
 
@@ -21,7 +22,6 @@ function initAudioAnalysis() {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         analyser = audioCtx.createAnalyser();
         
-        // Conexión de nodos
         const sourceStatic = audioCtx.createMediaElementSource(staticNoise);
         const sourceRadio = audioCtx.createMediaElementSource(radioBank);
         
@@ -38,50 +38,62 @@ function sendDataToVisualizer() {
     if (visualWindow && !visualWindow.closed && running) {
         analyser.getByteFrequencyData(dataArray);
         
-        // Calculamos el volumen real (0 a 255)
         let total = 0;
-        for(let i = 0; i < dataArray.length; i++) {
-            total += dataArray[i];
-        }
-        let volume = total / dataArray.length;
+        for(let i = 0; i < dataArray.length; i++) total += dataArray[i];
+        let audioVolume = (total / dataArray.length) * 2;
         
-        // Enviamos el volumen multiplicado por 2 para dar más sensibilidad
+        // Si el sistema está hablando una palabra paranormal, forzamos un volumen alto
+        let finalVolume = isSpeaking ? (60 + Math.random() * 40) : audioVolume;
+        
         visualWindow.postMessage({ 
             type: 'AUDIO_UPDATE', 
-            volume: volume * 2 
+            volume: finalVolume,
+            isSpeaking: isSpeaking // Avisamos al visualizador que es voz
         }, '*');
     }
 }
 
-// --- FUNCIONES ORIGINALES ---
-fetch('phrases.json').then(res => res.json()).then(data => phrases = data.phrases);
-
-function updateFrequencyDisplay() {
-    if (!dialEl || !dialWrapper || !running || msgEl.classList.contains('evp-active')) return;
-    const dialRect = dialEl.getBoundingClientRect();
-    const wrapperRect = dialWrapper.getBoundingClientRect();
-    const percent = Math.max(0, Math.min(1, (dialRect.left - wrapperRect.left) / (wrapperRect.width - dialRect.width)));
-    msgEl.textContent = `${(153.000 + (percent * 128.000)).toFixed(3)} kHz`;
-    
-    // MANDAR DATOS CONSTANTEMENTE
-    sendDataToVisualizer();
-}
-
+// --- FUNCIONES DE VOZ ---
 function speakTetric(text) {
     window.speechSynthesis.cancel();
     const utter = new SpeechSynthesisUtterance(text);
     utter.lang = 'es-ES';
     utter.pitch = 0.1;
-    utter.rate = 0.7;
-    utter.onstart = () => { msgEl.classList.add('evp-active'); msgEl.textContent = text.toUpperCase(); };
-    utter.onend = () => { msgEl.classList.remove('evp-active'); };
+    utter.rate = 0.6;
+
+    utter.onstart = () => { 
+        isSpeaking = true; // ACTIVAR REACCIÓN EN OSCILOSCOPIO
+        msgEl.classList.add('evp-active'); 
+        msgEl.textContent = text.toUpperCase(); 
+    };
+    
+    utter.onend = () => { 
+        isSpeaking = false; // DESACTIVAR REACCIÓN
+        msgEl.classList.remove('evp-active'); 
+    };
+
     window.speechSynthesis.speak(utter);
+}
+
+// --- LÓGICA DE CONTROL (Mantener igual que antes pero con sendDataToVisualizer) ---
+fetch('phrases.json').then(res => res.json()).then(data => phrases = data.phrases);
+
+function updateFrequencyDisplay() {
+    if (!dialEl || !dialWrapper || !running || msgEl.classList.contains('evp-active')) {
+        if(running) sendDataToVisualizer(); // Seguir enviando datos aunque no cambien kHz
+        return;
+    }
+    const dialRect = dialEl.getBoundingClientRect();
+    const wrapperRect = dialWrapper.getBoundingClientRect();
+    const percent = Math.max(0, Math.min(1, (dialRect.left - wrapperRect.left) / (wrapperRect.width - dialRect.width)));
+    msgEl.textContent = `${(153.000 + (percent * 128.000)).toFixed(3)} kHz`;
+    sendDataToVisualizer();
 }
 
 function playRandomRadioSlice() {
     if (!running) return;
     radioBank.currentTime = Math.random() * (radioBank.duration || 10);
-    radioBank.volume = 0.8; // Subimos volumen para que el visualizador lo note más
+    radioBank.volume = 0.8;
     radioBank.play().catch(() => {});
     setTimeout(() => { if (running) radioBank.pause(); }, 700 + Math.random() * 1000);
 }
@@ -89,15 +101,12 @@ function playRandomRadioSlice() {
 function startRadio() {
     initAudioAnalysis();
     if (audioCtx.state === 'suspended') audioCtx.resume();
-    
     running = true;
     btnToggle.textContent = "Detener";
     dialEl.classList.remove('paused-anim');
     displayUpdateId = setInterval(updateFrequencyDisplay, 50);
-    
     staticNoise.volume = 0.2;
     staticNoise.play();
-    
     radioTimerId = setInterval(playRandomRadioSlice, 12000);
     paranormalTimerId = setInterval(() => {
         if (running && phrases.length > 0) speakTetric(phrases[Math.floor(Math.random() * phrases.length)]);
@@ -106,6 +115,7 @@ function startRadio() {
 
 function stopRadio() {
     running = false;
+    isSpeaking = false;
     btnToggle.textContent = "Iniciar";
     dialEl.classList.add('paused-anim');
     clearInterval(displayUpdateId);
@@ -115,18 +125,12 @@ function stopRadio() {
     radioBank.pause();
     window.speechSynthesis.cancel();
     msgEl.textContent = "OFFLINE";
-    msgEl.classList.remove('evp-active');
 }
 
-btnToggle.onclick = () => {
-    if (running) stopRadio(); else startRadio();
-};
+btnToggle.onclick = () => { if (running) stopRadio(); else startRadio(); };
+btnVisualizer.onclick = () => { visualWindow = window.open('visualizer.html', 'SpiritVisualizer', 'width=500,height=600'); };
 
-btnVisualizer.onclick = () => {
-    visualWindow = window.open('visualizer.html', 'SpiritVisualizer', 'width=500,height=600');
-};
-
-// Modal Ayuda
+// Modal
 const modal = document.getElementById("infoModal");
 document.getElementById("btnInfo").onclick = () => modal.style.display = "block";
 document.querySelector(".close").onclick = () => modal.style.display = "none";
