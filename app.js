@@ -13,16 +13,15 @@ let displayUpdateId = null;
 let phrases = [];
 let isSpeaking = false; 
 
-// --- NUEVA VARIABLE PARA ACELERÓMETRO ---
+// --- GESTIÓN DEL ACELERÓMETRO REAL ---
 let currentYAccel = 0;
 
-// Captura de movimiento real (Eje Y)
-window.addEventListener('devicemotion', (event) => {
+function handleMotion(event) {
     if (event.accelerationIncludingGravity) {
-        // Invertimos o ajustamos según la orientación deseada
+        // Capturamos el eje Y (movimiento arriba/abajo)
         currentYAccel = event.accelerationIncludingGravity.y;
     }
-});
+}
 
 // --- MOTOR DE AUDIO ---
 let visualWindow = null;
@@ -49,7 +48,7 @@ function sendDataToVisualizer() {
         for(let i = 0; i < dataArray.length; i++) total += dataArray[i];
         let audioVolume = (total / dataArray.length) * 2;
         
-        // Enviamos el volumen Y la aceleración real
+        // Enviamos volumen y el valor real del acelerómetro
         visualWindow.postMessage({ 
             type: 'AUDIO_UPDATE', 
             volume: audioVolume,
@@ -93,35 +92,24 @@ function speakTetric(text) {
     window.speechSynthesis.speak(utter);
 }
 
-// --- CONTROLES ---
-function updateFrequencyDisplay() {
-    if (!running || isSpeaking) {
-        if(running) sendDataToVisualizer();
-        return;
-    }
-    const dialRect = dialEl.getBoundingClientRect();
-    const wrapperRect = dialWrapper.getBoundingClientRect();
-    const percent = Math.max(0, Math.min(1, (dialRect.left - wrapperRect.left) / (wrapperRect.width - dialRect.width)));
-    msgEl.textContent = `${(153.000 + (percent * 128.000)).toFixed(3)} kHz`;
-    sendDataToVisualizer();
-}
-
-function playRandomRadioSlice() {
-    if (!running || isSpeaking) return;
-    radioBank.currentTime = Math.random() * (radioBank.duration || 10);
-    radioBank.volume = 0.8;
-    radioBank.play().catch(() => {});
-    setTimeout(() => { if (running) radioBank.pause(); }, 800);
-}
-
-function startRadio() {
-    // Solicitar permiso para sensores en iOS si es necesario
+// --- CONTROLES Y PERMISOS ---
+async function startRadio() {
+    // Solicitar permisos de movimiento (Necesario en iOS)
     if (typeof DeviceMotionEvent.requestPermission === 'function') {
-        DeviceMotionEvent.requestPermission();
+        try {
+            const permission = await DeviceMotionEvent.requestPermission();
+            if (permission === 'granted') {
+                window.addEventListener('devicemotion', handleMotion);
+            }
+        } catch (e) { console.error("Error solicitando sensores:", e); }
+    } else {
+        // En Android/Desktop no suele requerir permiso explícito
+        window.addEventListener('devicemotion', handleMotion);
     }
-    
+
     initAudioAnalysis();
     if (audioCtx.state === 'suspended') audioCtx.resume();
+    
     running = true;
     btnToggle.textContent = "Detener";
     dialEl.classList.remove('paused-anim');
@@ -145,6 +133,27 @@ function stopRadio() {
     window.speechSynthesis.cancel();
     msgEl.textContent = "OFFLINE";
     msgEl.classList.remove('evp-active');
+    window.removeEventListener('devicemotion', handleMotion);
+}
+
+function updateFrequencyDisplay() {
+    if (!running || isSpeaking) {
+        if(running) sendDataToVisualizer();
+        return;
+    }
+    const dialRect = dialEl.getBoundingClientRect();
+    const wrapperRect = dialWrapper.getBoundingClientRect();
+    const percent = Math.max(0, Math.min(1, (dialRect.left - wrapperRect.left) / (wrapperRect.width - dialRect.width)));
+    msgEl.textContent = `${(153.000 + (percent * 128.000)).toFixed(3)} kHz`;
+    sendDataToVisualizer();
+}
+
+function playRandomRadioSlice() {
+    if (!running || isSpeaking) return;
+    radioBank.currentTime = Math.random() * (radioBank.duration || 10);
+    radioBank.volume = 0.8;
+    radioBank.play().catch(() => {});
+    setTimeout(() => { if (running) radioBank.pause(); }, 800);
 }
 
 btnToggle.onclick = () => {
@@ -157,6 +166,7 @@ btnVisualizer.onclick = () => {
     visualWindow = window.open('visualizer.html', 'SpiritVisualizer', 'width=500,height=600');
 };
 
+// Modal info
 const modal = document.getElementById("infoModal");
 document.getElementById("btnInfo").onclick = () => modal.style.display = "block";
 document.querySelector(".close").onclick = () => modal.style.display = "none";
