@@ -3,64 +3,70 @@
 <head>
     <meta charset="UTF-8">
     <style>
-        body {
-            margin: 0;
-            background: #000;
-            display: flex;
-            justify-content: space-around;
-            align-items: center;
-            height: 100vh;
-            overflow: hidden;
-            font-family: monospace;
-        }
-        .v-column {
-            flex: 1;
-            height: 80%;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            gap: 20px;
-        }
-        .v-column span {
-            color: #444;
-            font-size: 10px;
-            text-transform: uppercase;
-            text-align: center;
-        }
-        .wave {
-            width: 80%;
-            height: 0%;
-            transition: height 0.15s ease-out;
-            clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
-            opacity: 0.8;
-            box-shadow: 0 0 20px rgba(255,255,255,0.2);
-        }
-        /* Colores del video original */
-        .blue { background: linear-gradient(#00d2ff, #3a7bd5); }
-        .green { background: linear-gradient(#11ffbd, #aaff00); }
-        .yellow { background: linear-gradient(#ffe259, #ffa751); }
-        .red { background: linear-gradient(#ff416c, #ff4b2b); }
+        body { background: #000; margin: 0; display: flex; flex-direction: column; height: 100vh; justify-content: space-around; padding: 20px; box-sizing: border-box; }
+        .canvas-item { position: relative; width: 100%; height: 20%; background: #050505; border: 1px solid #111; }
+        canvas { width: 100%; height: 100%; }
+        .label { position: absolute; top: 5px; left: 10px; color: #444; font-family: monospace; font-size: 10px; }
     </style>
 </head>
 <body>
-    <div class="v-column"><span>Ondas Radio</span><div id="w1" class="wave blue"></div></div>
-    <div class="v-column"><span>En. Cinética</span><div id="w2" class="wave green"></div></div>
-    <div class="v-column"><span>Magnetómetro</span><div id="w3" class="wave yellow"></div></div>
-    <div class="v-column"><span>Infrarrojos</span><div id="w4" class="wave red"></div></div>
+    <div class="canvas-item"><span class="label">RF SCANNER</span><canvas id="c1"></canvas></div>
+    <div class="canvas-item"><span class="label">KINETIC ENERGY</span><canvas id="c2"></canvas></div>
+    <div class="canvas-item"><span class="label">MAGNETIC FIELD</span><canvas id="c3"></canvas></div>
+    <div class="canvas-item"><span class="label">INFRARED</span><canvas id="c4"></canvas></div>
 
     <script>
-        // Escucha mensajes de la ventana principal
-        window.addEventListener('message', (event) => {
-            if (event.data.type === 'UPDATE') {
-                document.querySelectorAll('.wave').forEach(w => {
-                    const h = Math.floor(Math.random() * 70) + 10;
-                    w.style.height = h + '%';
-                });
-            } else if (event.data.type === 'STOP') {
-                document.querySelectorAll('.wave').forEach(w => w.style.height = '0%');
+        let currentVolume = 0;
+        let time = 0;
+
+        window.addEventListener('message', (e) => {
+            if (e.data.type === 'AUDIO_UPDATE') {
+                currentVolume = e.data.volume;
             }
         });
+
+        const configs = [
+            { id: 'c1', color: '#ff3333', speed: 0.1 },
+            { id: 'c2', color: '#33ff33', speed: 0.15 },
+            { id: 'c3', color: '#33aaff', speed: 0.08 },
+            { id: 'c4', color: '#ffcc00', speed: 0.12 }
+        ];
+
+        function draw() {
+            time += 0.05;
+            configs.forEach((cfg) => {
+                const canvas = document.getElementById(cfg.id);
+                const ctx = canvas.getContext('2d');
+                canvas.width = canvas.offsetWidth;
+                canvas.height = canvas.offsetHeight;
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.beginPath();
+                ctx.strokeStyle = cfg.color;
+                ctx.lineWidth = 2;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = cfg.color;
+
+                for (let x = 0; x < canvas.width; x++) {
+                    // Mezcla de ondas aleatorias + Reacción al volumen
+                    let noise = Math.sin(x * 0.02 + time * cfg.speed) * 10;
+                    let reaction = (currentVolume / 2) * Math.sin(x * 0.05 + time * 5);
+                    
+                    // Si no hay volumen, la onda es mínima
+                    let y = (canvas.height / 2) + noise + reaction + (Math.random() * (currentVolume/10));
+
+                    // Bordes suaves
+                    let edge = Math.sin((x / canvas.width) * Math.PI);
+                    y = (canvas.height / 2) + (y - canvas.height / 2) * edge;
+
+                    if (x === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+            });
+            requestAnimationFrame(draw);
+        }
+        draw();
     </script>
 </body>
 </html>
