@@ -1,3 +1,11 @@
+/**
+ * @file app.js
+ * @author José A. Vázquez Mingorance
+ * @date 26-02-2025
+ * @description Lógica principal de la Spirit Radio LW. Gestiona el barrido aleatorio de audio,
+ * el análisis de frecuencias para el visualizador y la síntesis de voz (EVP) con 
+ * protocolos de seguridad anti-bloqueo.
+ */
 let running = false;
 const msgEl = document.getElementById("message");
 const btnToggle = document.getElementById("btnToggle");
