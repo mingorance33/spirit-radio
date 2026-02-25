@@ -1,79 +1,44 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Scanner Monitor</title>
-    <style>
-        body { background: #000; margin: 0; display: flex; flex-direction: column; height: 100vh; justify-content: space-around; padding: 40px 20px 20px 20px; box-sizing: border-box; overflow: hidden; font-family: monospace; }
-        #btnClose { position: fixed; top: 10px; right: 10px; background: #222; color: #ff3333; border: 1px solid #ff3333; width: 30px; height: 30px; cursor: pointer; border-radius: 4px; font-weight: bold; z-index: 100; }
-        .container { position: relative; width: 100%; height: 21%; background: #020202; border: 1px solid #111; border-radius: 4px; }
-        canvas { width: 100%; height: 100%; }
-        .label { position: absolute; top: 4px; left: 8px; color: #444; font-size: 9px; letter-spacing: 1px; }
-    </style>
-</head>
-<body>
-    <button id="btnClose" onclick="window.close()">X</button>
+// Dentro del script de visualizer.html, actualiza la función de recepción y render:
 
-    <div class="container"><span class="label">RF SPECTRUM</span><canvas id="c1"></canvas></div>
-    <div class="container"><span class="label">KINETIC ENERGY</span><canvas id="c2"></canvas></div>
-    <div class="container"><span class="label">MAGNETIC FIELD</span><canvas id="c3"></canvas></div>
-    <div class="container"><span class="label">INFRARED SENSOR</span><canvas id="c4"></canvas></div>
+let isSpeaking = false;
 
-    <script>
-        let vol = 0;
-        let t = 0;
-        
-        window.onmessage = (e) => { 
-            if(e.data.type === 'AUDIO_UPDATE') {
-                // Suavizamos la caída del volumen para que no parpadee brusco
-                vol = e.data.volume; 
-            }
-        };
+window.onmessage = (e) => { 
+    if(e.data.type === 'AUDIO_UPDATE') {
+        vol = e.data.volume; 
+        isSpeaking = e.data.isSpeaking; // Recibimos si la app está hablando
+    }
+};
 
-        const waves = [
-            { id: 'c1', col: '#ff3333', step: 0.02, speed: 0.1 },
-            { id: 'c2', col: '#33ff33', step: 0.05, speed: 0.2 },
-            { id: 'c3', col: '#33aaff', step: 0.03, speed: 0.15 },
-            { id: 'c4', col: '#ffcc00', step: 0.06, speed: 0.25 }
-        ];
+function render() {
+    t += 0.15;
+    waves.forEach(w => {
+        const canvas = document.getElementById(w.id);
+        const ctx = canvas.getContext('2d');
+        canvas.width = canvas.offsetWidth;
+        canvas.height = canvas.offsetHeight;
 
-        function render() {
-            t += 0.15;
-            waves.forEach(w => {
-                const canvas = document.getElementById(w.id);
-                const ctx = canvas.getContext('2d');
-                canvas.width = canvas.offsetWidth;
-                canvas.height = canvas.offsetHeight;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.beginPath();
+        ctx.strokeStyle = w.col;
+        ctx.lineWidth = isSpeaking ? 3 : 2; // Línea más gruesa al hablar
+        ctx.shadowBlur = isSpeaking ? 20 : vol / 3;
+        ctx.shadowColor = w.col;
 
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.beginPath();
-                ctx.strokeStyle = w.col;
-                ctx.lineWidth = 2;
-                ctx.shadowBlur = vol / 3;
-                ctx.shadowColor = w.col;
+        for(let x=0; x<canvas.width; x++) {
+            // Si está hablando, la agitación es máxima y caótica
+            let agitation = isSpeaking ? (25 + Math.random() * 30) : (vol * 0.8);
+            let baseSine = Math.sin(x * w.step + t * w.speed) * (isSpeaking ? 15 : (5 + vol/4));
+            let jitter = (Math.random() - 0.5) * agitation;
+            
+            let y = (canvas.height/2) + baseSine + jitter;
+            
+            let mask = Math.sin((x/canvas.width) * Math.PI);
+            y = (canvas.height/2) + (y - canvas.height/2) * mask;
 
-                for(let x=0; x<canvas.width; x++) {
-                    // Calculamos la agitación de la onda basada en el volumen
-                    let agitation = vol * 0.8;
-                    let baseSine = Math.sin(x * w.step + t * w.speed) * (5 + vol/4);
-                    let jitter = (Math.random() - 0.5) * agitation;
-                    
-                    let y = (canvas.height/2) + baseSine + jitter;
-                    
-                    // Máscara para que los bordes mueran en el centro
-                    let mask = Math.sin((x/canvas.width) * Math.PI);
-                    y = (canvas.height/2) + (y - canvas.height/2) * mask;
-
-                    if(x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-                }
-                ctx.stroke();
-            });
-
-            // Bajamos el volumen artificialmente poco a poco para suavidad
-            vol *= 0.9; 
-
-            requestAnimationFrame(render);
+            if(x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
         }
-        render();
-    </script>
-</body>
-</html>
+        ctx.stroke();
+    });
+    if (!isSpeaking) vol *= 0.9; 
+    requestAnimationFrame(render);
+}
