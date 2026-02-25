@@ -2,154 +2,65 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Osciloscopio Spirit Radio</title>
     <style>
-        body { 
-            background: #000; margin: 0; display: flex; flex-direction: column; 
-            height: 100vh; justify-content: space-around; padding: 40px 20px 20px 20px; 
-            box-sizing: border-box; overflow: hidden; font-family: 'Courier New', Courier, monospace;
+        body {
+            margin: 0;
+            background: #000;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            font-family: monospace;
         }
-        /* Canvas de efecto especial (capa superior) */
-        #glitchCanvas {
-            position: fixed; top: 0; left: 0;
-            width: 100vw; height: 100vh;
-            pointer-events: none; z-index: 50;
+        .v-column {
+            flex: 1;
+            height: 80%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
         }
-        #btnClose {
-            position: fixed; top: 10px; right: 10px; 
-            background: #111; color: #ff3333; border: 2px solid #ff3333;
-            width: 45px; height: 45px; cursor: pointer; border-radius: 4px;
-            font-weight: bold; font-size: 20px; z-index: 100;
+        .v-column span {
+            color: #444;
+            font-size: 10px;
+            text-transform: uppercase;
+            text-align: center;
         }
-        .container { 
-            position: relative; width: 100%; height: 21%; 
-            background: #020202; border: 1px solid #1a1a1a; 
-            border-radius: 8px;
+        .wave {
+            width: 80%;
+            height: 0%;
+            transition: height 0.15s ease-out;
+            clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+            opacity: 0.8;
+            box-shadow: 0 0 20px rgba(255,255,255,0.2);
         }
-        canvas { width: 100%; height: 100%; }
-        .label { 
-            position: absolute; top: 8px; left: 12px; 
-            color: #888; font-size: 18px; font-weight: bold;
-            letter-spacing: 2px; text-shadow: 1px 1px 2px #000;
-            pointer-events: none; z-index: 5;
-        }
+        /* Colores del video original */
+        .blue { background: linear-gradient(#00d2ff, #3a7bd5); }
+        .green { background: linear-gradient(#11ffbd, #aaff00); }
+        .yellow { background: linear-gradient(#ffe259, #ffa751); }
+        .red { background: linear-gradient(#ff416c, #ff4b2b); }
     </style>
 </head>
 <body>
-    <button id="btnClose" onclick="window.close()">X</button>
-    
-    <canvas id="glitchCanvas"></canvas>
-
-    <div class="container"><span class="label">RF SPECTRUM</span><canvas id="c1"></canvas></div>
-    <div class="container"><span class="label">KINETIC ENERGY</span><canvas id="c2"></canvas></div>
-    <div class="container"><span class="label">MAGNETIC FIELD</span><canvas id="c3"></canvas></div>
-    <div class="container"><span class="label">INFRARED SENSOR</span><canvas id="c4"></canvas></div>
+    <div class="v-column"><span>Ondas Radio</span><div id="w1" class="wave blue"></div></div>
+    <div class="v-column"><span>En. Cinética</span><div id="w2" class="wave green"></div></div>
+    <div class="v-column"><span>Magnetómetro</span><div id="w3" class="wave yellow"></div></div>
+    <div class="v-column"><span>Infrarrojos</span><div id="w4" class="wave red"></div></div>
 
     <script>
-        let vol = 0;
-        let t = 0;
-        let isSpeaking = false;
-        let yMotion = 0;
-        let lastIsSpeaking = false;
-        let showZigZag = false;
-
-        window.onmessage = (e) => { 
-            if(e.data.type === 'AUDIO_UPDATE') {
-                vol = e.data.volume;
-                isSpeaking = e.data.isSpeaking;
-                yMotion = (e.data.yAccel || 0) * 8;
-
-                // Si acaba de empezar a hablar, activamos el zigzag 1 segundo
-                if (isSpeaking && !lastIsSpeaking) {
-                    showZigZag = true;
-                    setTimeout(() => { showZigZag = false; }, 1000);
-                }
-                lastIsSpeaking = isSpeaking;
+        // Escucha mensajes de la ventana principal
+        window.addEventListener('message', (event) => {
+            if (event.data.type === 'UPDATE') {
+                document.querySelectorAll('.wave').forEach(w => {
+                    const h = Math.floor(Math.random() * 70) + 10;
+                    w.style.height = h + '%';
+                });
+            } else if (event.data.type === 'STOP') {
+                document.querySelectorAll('.wave').forEach(w => w.style.height = '0%');
             }
-        };
-
-        const waves = [
-            { id: 'c1', col: '#ff3333', step: 0.02, speed: 0.1 },
-            { id: 'c2', col: '#33ff33', step: 0.05, speed: 0.2 },
-            { id: 'c3', col: '#33aaff', step: 0.03, speed: 0.15 },
-            { id: 'c4', col: '#ffcc00', step: 0.06, speed: 0.25 }
-        ];
-
-        const gCanvas = document.getElementById('glitchCanvas');
-        const gCtx = gCanvas.getContext('2d');
-
-        function drawZigZag() {
-            if (!showZigZag) {
-                gCtx.clearRect(0, 0, gCanvas.width, gCanvas.height);
-                return;
-            }
-            
-            gCanvas.width = window.innerWidth;
-            gCanvas.height = window.innerHeight;
-            
-            gCtx.clearRect(0, 0, gCanvas.width, gCanvas.height);
-            gCtx.beginPath();
-            gCtx.strokeStyle = "rgba(255, 255, 255, 0.8)";
-            gCtx.lineWidth = 3;
-            gCtx.shadowBlur = 20;
-            gCtx.shadowColor = "#00ffff";
-
-            let curX = gCanvas.width / 2 + (Math.random() * 100 - 50);
-            let curY = 0;
-            gCtx.moveTo(curX, curY);
-
-            // Crear el rayo vertical en zigzag
-            while (curY < gCanvas.height) {
-                curX += (Math.random() * 60 - 30);
-                curY += (Math.random() * 40);
-                gCtx.lineTo(curX, curY);
-            }
-            gCtx.stroke();
-            
-            // Flash blanco aleatorio de fondo
-            if (Math.random() > 0.8) {
-                gCtx.fillStyle = "rgba(255, 255, 255, 0.1)";
-                gCtx.fillRect(0, 0, gCanvas.width, gCanvas.height);
-            }
-        }
-
-        function render() {
-            t += 0.15;
-            drawZigZag(); // Renderizar el efecto de unión
-
-            waves.forEach(w => {
-                const canvas = document.getElementById(w.id);
-                if(!canvas) return;
-                const ctx = canvas.getContext('2d');
-                canvas.width = canvas.offsetWidth;
-                canvas.height = canvas.offsetHeight;
-
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.beginPath();
-                ctx.strokeStyle = showZigZag ? "#fff" : w.col; // Se vuelven blancos durante el rayo
-                ctx.lineWidth = isSpeaking ? 3 : 2;
-                ctx.shadowBlur = isSpeaking ? 20 : 5;
-                ctx.shadowColor = ctx.strokeStyle;
-
-                for(let x=0; x<canvas.width; x++) {
-                    let agitation = isSpeaking ? (40 + Math.random()*30) : (vol * 0.7);
-                    if (showZigZag) agitation += 50; // Más distorsión durante el rayo
-
-                    let baseSine = Math.sin(x * w.step + t * w.speed) * (isSpeaking ? 15 : 5);
-                    let kineticY = (w.id === 'c2') ? yMotion : 0;
-                    let jitter = (Math.random() - 0.5) * agitation;
-                    
-                    let y = (canvas.height/2) + baseSine + jitter + kineticY;
-                    let mask = Math.sin((x/canvas.width) * Math.PI);
-                    y = (canvas.height/2) + (y - canvas.height/2) * mask;
-
-                    if(x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-                }
-                ctx.stroke();
-            });
-            requestAnimationFrame(render);
-        }
-        render();
+        });
     </script>
 </body>
 </html>
