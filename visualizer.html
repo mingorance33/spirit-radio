@@ -41,14 +41,14 @@
         let vol = 0;
         let t = 0;
         let isSpeaking = false;
-        let realYAccel = 0; // Almacena el movimiento real
+        let yMotion = 0; // Para el desplazamiento vertical real
 
         window.onmessage = (e) => { 
             if(e.data.type === 'AUDIO_UPDATE') {
                 vol = e.data.volume;
                 isSpeaking = e.data.isSpeaking;
-                // Suavizamos un poco la entrada del acelerómetro para que no salte demasiado
-                realYAccel = e.data.yAccel || 0;
+                // Suavizado suave (interpolación) para que el movimiento no sea brusco
+                yMotion = (e.data.yAccel || 0) * 7; 
             }
         };
 
@@ -79,19 +79,15 @@
                     let agitation = isSpeaking ? (30 + Math.random()*20) : (vol * 0.7);
                     let baseSine = Math.sin(x * w.step + t * w.speed) * (isSpeaking ? 15 : 5);
                     
-                    // LÓGICA DE MOVIMIENTO REAL:
-                    // Si es el canal Kinetic Energy (c2), aplicamos el desplazamiento de realYAccel
-                    let kineticShift = 0;
-                    if(w.id === 'c2') {
-                        kineticShift = realYAccel * 8; // Ajusta el '8' para más o menos sensibilidad
-                    }
-
+                    // EFECTO KINETIC: Desplazamos todo el eje Y según el acelerómetro
+                    let kineticY = (w.id === 'c2') ? yMotion : 0;
+                    
                     let jitter = (Math.random() - 0.5) * agitation;
                     
-                    // Sumamos kineticShift a la posición Y
-                    let y = (canvas.height/2) + baseSine + jitter + kineticShift;
+                    // Calculamos Y final asegurándonos de que esté centrada + desplazamiento real
+                    let y = (canvas.height/2) + baseSine + jitter + kineticY;
                     
-                    // Máscara para suavizar los bordes del canvas
+                    // Máscara lateral para que la línea no toque los bordes izquierdo/derecho
                     let mask = Math.sin((x/canvas.width) * Math.PI);
                     y = (canvas.height/2) + (y - canvas.height/2) * mask;
 
