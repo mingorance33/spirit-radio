@@ -14,8 +14,8 @@ let phrases = [];
 let isSpeaking = false; 
 
 // --- MOTOR DE AUDIO ---
-let visualWindow = null;
 let audioCtx, analyser, dataArray;
+let visualWindow = null;
 
 function initAudioAnalysis() {
     if (!audioCtx) {
@@ -41,103 +41,86 @@ function sendDataToVisualizer() {
     }
 }
 
-// --- LÓGICA DE RADIO (BARRIDO ALEATORIO) ---
+// --- LÓGICA DE RADIO (BARRIDO) ---
 function playRandomRadioSlice() {
     if (!running || isSpeaking) return;
-
-    // Limpiar cualquier timer previo para evitar duplicados
     clearTimeout(radioTimerId);
 
-    // Saltar a punto aleatorio
     const duration = radioBank.duration || 10;
     radioBank.currentTime = Math.random() * duration;
     radioBank.volume = Math.random() * 0.4 + 0.2;
     
     radioBank.play().then(() => {
-        // Duración del "chispazo" de radio (muy breve)
         const sliceDuration = Math.random() * 400 + 200; 
-        
         radioTimerId = setTimeout(() => {
             radioBank.pause();
-            // Tiempo hasta el siguiente chispazo
             if (running && !isSpeaking) {
-                const nextWait = Math.random() * 1500 + 300;
-                radioTimerId = setTimeout(playRandomRadioSlice, nextWait);
+                radioTimerId = setTimeout(playRandomRadioSlice, Math.random() * 1000 + 200);
             }
         }, sliceDuration);
     }).catch(() => {
-        // Si falla el play (ej. interacción), reintentar en 1s
-        radioTimerId = setTimeout(playRandomRadioSlice, 1000);
+        radioTimerId = setTimeout(playRandomRadioSlice, 500);
     });
 }
 
-// --- LÓGICA DE VOZ ---
+// --- LÓGICA DE VOZ (CON ANTI-BLOQUEO) ---
 fetch('phrases.json').then(res => res.json()).then(data => phrases = data.phrases);
 
 function triggerParanormalEvent() {
     if (!running || phrases.length === 0 || isSpeaking) return;
 
     isSpeaking = true;
-    clearTimeout(radioTimerId); // Detenemos la radio inmediatamente
+    clearTimeout(radioTimerId);
     radioBank.pause();
 
     msgEl.classList.add('evp-active');
     msgEl.textContent = "SINTONIZANDO...";
 
-    // 1 segundo de "tensión" antes de la palabra
-    setTimeout(() => {
-        if (!running) {
-            isSpeaking = false;
-            return;
+    // Seguridad: Si en 3 segundos no ha hablado, forzar reset
+    const safetyTimeout = setTimeout(() => {
+        if (msgEl.textContent === "SINTONIZANDO...") {
+            console.log("Voz trabada, reseteando...");
+            resetAfterVoice();
         }
-        const randomPhrase = phrases[Math.floor(Math.random() * phrases.length)];
-        speakTetric(randomPhrase);
-    }, 1000);
+    }, 4000);
+
+    setTimeout(() => {
+        if (!running) return;
+        const text = phrases[Math.floor(Math.random() * phrases.length)];
+        
+        window.speechSynthesis.cancel(); // Limpiar cola previa
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = 'es-ES';
+        utter.pitch = 0.1;
+        utter.rate = 0.6;
+
+        utter.onstart = () => {
+            clearTimeout(safetyTimeout);
+            msgEl.textContent = text.toUpperCase();
+        };
+        
+        utter.onend = () => resetAfterVoice();
+        utter.onerror = () => resetAfterVoice();
+
+        window.speechSynthesis.speak(utter);
+    }, 1500);
 }
 
-function speakTetric(text) {
-    window.speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(text);
-    utter.lang = 'es-ES';
-    utter.pitch = 0.1;
-    utter.rate = 0.6;
-
-    utter.onstart = () => { 
-        msgEl.textContent = text.toUpperCase(); 
-    };
-    
-    utter.onend = () => { 
-        isSpeaking = false; 
-        msgEl.classList.remove('evp-active'); 
-        // IMPORTANTE: Al terminar, devolvemos el ciclo a la radio
-        if (running) playRandomRadioSlice();
-    };
-
-    utter.onerror = () => {
-        isSpeaking = false;
-        msgEl.classList.remove('evp-active');
-        if (running) playRandomRadioSlice();
-    };
-
-    window.speechSynthesis.speak(utter);
+function resetAfterVoice() {
+    isSpeaking = false;
+    msgEl.classList.remove('evp-active');
+    if (running) playRandomRadioSlice();
 }
 
-// --- CONTROLES Y BUCLE ---
-function updateFrequencyDisplay() {
-    if (!running) return;
-    if (!isSpeaking) {
-        const dialRect = dialEl.getBoundingClientRect();
-        const wrapperRect = dialWrapper.getBoundingClientRect();
-        const percent = Math.max(0, Math.min(1, (dialRect.left - wrapperRect.left) / (wrapperRect.width - dialRect.width)));
-        msgEl.textContent = `${(153.000 + (percent * 128.000)).toFixed(3)} kHz`;
-    }
-    sendDataToVisualizer();
-}
-
+// --- CONTROLES ---
 function startRadio() {
     initAudioAnalysis();
     if (audioCtx.state === 'suspended') audioCtx.resume();
     
+    // TRUCO: Desbloquear voz con un mensaje vacío al inicio
+    const unlock = new SpeechSynthesisUtterance("");
+    window.speechSynthesis.speak(unlock);
+
     running = true;
     btnToggle.textContent = "Detener";
     dialEl.classList.remove('paused-anim');
@@ -145,13 +128,18 @@ function startRadio() {
     staticNoise.volume = 0.2;
     staticNoise.play();
     
-    displayUpdateId = setInterval(updateFrequencyDisplay, 50);
+    displayUpdateId = setInterval(() => {
+        if (!isSpeaking && running) {
+            const dialRect = dialEl.getBoundingClientRect();
+            const wrapperRect = dialWrapper.getBoundingClientRect();
+            const percent = Math.max(0, Math.min(1, (dialRect.left - wrapperRect.left) / (wrapperRect.width - dialRect.width)));
+            msgEl.textContent = `${(153.000 + (percent * 128.000)).toFixed(3)} kHz`;
+        }
+        sendDataToVisualizer();
+    }, 50);
     
-    // Lanzar primer ciclo de radio
     playRandomRadioSlice();
-    
-    // Intervalo de eventos paranormales (cada 15-20 segundos)
-    paranormalTimerId = setInterval(triggerParanormalEvent, 18000);
+    paranormalTimerId = setInterval(triggerParanormalEvent, 15000); // Cada 15 seg intenta hablar
 }
 
 function stopRadio() {
@@ -159,11 +147,9 @@ function stopRadio() {
     isSpeaking = false;
     btnToggle.textContent = "Iniciar";
     dialEl.classList.add('paused-anim');
-    
     clearInterval(displayUpdateId);
     clearInterval(paranormalTimerId);
     clearTimeout(radioTimerId);
-    
     staticNoise.pause();
     radioBank.pause();
     window.speechSynthesis.cancel();
@@ -179,8 +165,7 @@ btnVisualizer.onclick = () => {
     visualWindow = window.open('visualizer.html', 'SpiritVisualizer', 'width=500,height=600');
 };
 
-// Modal logic (igual que antes)
+// Modal (Simplificado)
 const modal = document.getElementById("infoModal");
 document.getElementById("btnInfo").onclick = () => modal.style.display = "block";
 document.querySelector(".close").onclick = () => modal.style.display = "none";
-window.onclick = (e) => { if (e.target == modal) modal.style.display = "none"; };
