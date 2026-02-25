@@ -1,3 +1,11 @@
+/**
+ * @file style.css
+ * @author José A. Vázquez Mingorance
+ * @date 26-02-2025
+ * @description Estilos globales del proyecto. Define la paleta de colores neón, 
+ * las animaciones del dial y el diseño responsivo de la aplicación.
+ */
+
 * { box-sizing: border-box; }
 
 body {
