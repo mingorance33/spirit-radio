@@ -13,6 +13,17 @@ let displayUpdateId = null;
 let phrases = [];
 let isSpeaking = false; 
 
+// --- NUEVA VARIABLE PARA ACELERÓMETRO ---
+let currentYAccel = 0;
+
+// Captura de movimiento real (Eje Y)
+window.addEventListener('devicemotion', (event) => {
+    if (event.accelerationIncludingGravity) {
+        // Invertimos o ajustamos según la orientación deseada
+        currentYAccel = event.accelerationIncludingGravity.y;
+    }
+});
+
 // --- MOTOR DE AUDIO ---
 let visualWindow = null;
 let audioCtx, analyser, dataArray;
@@ -38,28 +49,26 @@ function sendDataToVisualizer() {
         for(let i = 0; i < dataArray.length; i++) total += dataArray[i];
         let audioVolume = (total / dataArray.length) * 2;
         
+        // Enviamos el volumen Y la aceleración real
         visualWindow.postMessage({ 
             type: 'AUDIO_UPDATE', 
             volume: audioVolume,
-            isSpeaking: isSpeaking 
+            isSpeaking: isSpeaking,
+            yAccel: currentYAccel 
         }, '*');
     }
 }
 
-// --- LÓGICA DE VOZ CON PRE-DISTORSIÓN ---
+// --- LÓGICA DE VOZ ---
 fetch('phrases.json').then(res => res.json()).then(data => phrases = data.phrases);
 
 function triggerParanormalEvent() {
     if (!running || phrases.length === 0 || isSpeaking) return;
-
     const randomPhrase = phrases[Math.floor(Math.random() * phrases.length)];
-
-    // PASO 1: Iniciar distorsión un segundo antes
     isSpeaking = true; 
     msgEl.classList.add('evp-active');
-    msgEl.textContent = "SINTONIZANDO..."; // Opcional: un mensaje de aviso
+    msgEl.textContent = "SINTONIZANDO...";
 
-    // PASO 2: Esperar 1000ms (1 segundo) antes de que hable la voz
     setTimeout(() => {
         if (running) {
             speakTetric(randomPhrase);
@@ -76,22 +85,17 @@ function speakTetric(text) {
     utter.lang = 'es-ES';
     utter.pitch = 0.1;
     utter.rate = 0.6;
-
-    utter.onstart = () => { 
-        msgEl.textContent = text.toUpperCase(); 
-    };
-    
+    utter.onstart = () => { msgEl.textContent = text.toUpperCase(); };
     utter.onend = () => { 
         isSpeaking = false; 
         msgEl.classList.remove('evp-active'); 
     };
-
     window.speechSynthesis.speak(utter);
 }
 
-// --- CONTROLES Y BUCLE ---
+// --- CONTROLES ---
 function updateFrequencyDisplay() {
-    if (!running || isSpeaking) { // Si hay evento paranormal, no movemos los diales
+    if (!running || isSpeaking) {
         if(running) sendDataToVisualizer();
         return;
     }
@@ -111,6 +115,11 @@ function playRandomRadioSlice() {
 }
 
 function startRadio() {
+    // Solicitar permiso para sensores en iOS si es necesario
+    if (typeof DeviceMotionEvent.requestPermission === 'function') {
+        DeviceMotionEvent.requestPermission();
+    }
+    
     initAudioAnalysis();
     if (audioCtx.state === 'suspended') audioCtx.resume();
     running = true;
@@ -119,10 +128,7 @@ function startRadio() {
     displayUpdateId = setInterval(updateFrequencyDisplay, 50);
     staticNoise.volume = 0.2;
     staticNoise.play();
-    
     radioTimerId = setInterval(playRandomRadioSlice, 12000);
-    
-    // El intervalo ahora llama al EVENTO (que incluye el segundo de espera)
     paranormalTimerId = setInterval(triggerParanormalEvent, 20000);
 }
 
