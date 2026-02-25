@@ -13,7 +13,17 @@ let displayUpdateId = null;
 let phrases = [];
 let isSpeaking = false; 
 
-// --- MOTOR DE AUDIO ---
+// --- GESTIÓN DE MOVIMIENTO REAL (SENSORES) ---
+let currentYAccel = 0;
+
+function handleMotion(event) {
+    if (event.accelerationIncludingGravity) {
+        // Capturamos la aceleración en el eje Y (movimiento vertical)
+        currentYAccel = event.accelerationIncludingGravity.y;
+    }
+}
+
+// --- MOTOR DE AUDIO Y COMUNICACIÓN CON VISUALIZADOR ---
 let visualWindow = null;
 let audioCtx, analyser, dataArray;
 
@@ -38,28 +48,31 @@ function sendDataToVisualizer() {
         for(let i = 0; i < dataArray.length; i++) total += dataArray[i];
         let audioVolume = (total / dataArray.length) * 2;
         
+        // Enviamos el estado de voz (isSpeaking), el volumen y el movimiento real (yAccel)
         visualWindow.postMessage({ 
             type: 'AUDIO_UPDATE', 
             volume: audioVolume,
-            isSpeaking: isSpeaking 
+            isSpeaking: isSpeaking,
+            yAccel: currentYAccel 
         }, '*');
     }
 }
 
-// --- LÓGICA DE VOZ CON PRE-DISTORSIÓN ---
-fetch('phrases.json').then(res => res.json()).then(data => phrases = data.phrases);
+// --- LÓGICA DE FRASES PARANORMALES ---
+fetch('phrases.json')
+    .then(res => res.json())
+    .then(data => phrases = data.phrases)
+    .catch(err => console.error("Error cargando frases:", err));
 
 function triggerParanormalEvent() {
     if (!running || phrases.length === 0 || isSpeaking) return;
-
+    
     const randomPhrase = phrases[Math.floor(Math.random() * phrases.length)];
-
-    // PASO 1: Iniciar distorsión un segundo antes
     isSpeaking = true; 
     msgEl.classList.add('evp-active');
-    msgEl.textContent = "SINTONIZANDO..."; // Opcional: un mensaje de aviso
+    msgEl.textContent = "SINTONIZANDO...";
 
-    // PASO 2: Esperar 1000ms (1 segundo) antes de que hable la voz
+    // Pequeño retraso para crear tensión antes de que hable
     setTimeout(() => {
         if (running) {
             speakTetric(randomPhrase);
@@ -74,9 +87,9 @@ function speakTetric(text) {
     window.speechSynthesis.cancel();
     const utter = new SpeechSynthesisUtterance(text);
     utter.lang = 'es-ES';
-    utter.pitch = 0.1;
-    utter.rate = 0.6;
-
+    utter.pitch = 0.1; // Voz grave/tétrica
+    utter.rate = 0.6;  // Velocidad lenta
+    
     utter.onstart = () => { 
         msgEl.textContent = text.toUpperCase(); 
     };
@@ -85,20 +98,24 @@ function speakTetric(text) {
         isSpeaking = false; 
         msgEl.classList.remove('evp-active'); 
     };
-
+    
     window.speechSynthesis.speak(utter);
 }
 
-// --- CONTROLES Y BUCLE ---
+// --- CONTROLES DE LA INTERFAZ ---
+
 function updateFrequencyDisplay() {
-    if (!running || isSpeaking) { // Si hay evento paranormal, no movemos los diales
+    if (!running || isSpeaking) {
         if(running) sendDataToVisualizer();
         return;
     }
     const dialRect = dialEl.getBoundingClientRect();
     const wrapperRect = dialWrapper.getBoundingClientRect();
     const percent = Math.max(0, Math.min(1, (dialRect.left - wrapperRect.left) / (wrapperRect.width - dialRect.width)));
+    
+    // Simulación de frecuencia kHz
     msgEl.textContent = `${(153.000 + (percent * 128.000)).toFixed(3)} kHz`;
+    
     sendDataToVisualizer();
 }
 
@@ -110,19 +127,34 @@ function playRandomRadioSlice() {
     setTimeout(() => { if (running) radioBank.pause(); }, 800);
 }
 
-function startRadio() {
+async function startRadio() {
+    // Solicitar permiso para sensores de movimiento (Vital en iOS)
+    if (typeof DeviceMotionEvent.requestPermission === 'function') {
+        try {
+            const permission = await DeviceMotionEvent.requestPermission();
+            if (permission === 'granted') {
+                window.addEventListener('devicemotion', handleMotion);
+            }
+        } catch (e) {
+            console.error("Error solicitando sensores:", e);
+        }
+    } else {
+        // En Android/Desktop se añade directamente
+        window.addEventListener('devicemotion', handleMotion);
+    }
+
     initAudioAnalysis();
     if (audioCtx.state === 'suspended') audioCtx.resume();
+    
     running = true;
     btnToggle.textContent = "Detener";
     dialEl.classList.remove('paused-anim');
+    
     displayUpdateId = setInterval(updateFrequencyDisplay, 50);
     staticNoise.volume = 0.2;
     staticNoise.play();
     
     radioTimerId = setInterval(playRandomRadioSlice, 12000);
-    
-    // El intervalo ahora llama al EVENTO (que incluye el segundo de espera)
     paranormalTimerId = setInterval(triggerParanormalEvent, 20000);
 }
 
@@ -131,27 +163,41 @@ function stopRadio() {
     isSpeaking = false;
     btnToggle.textContent = "Iniciar";
     dialEl.classList.add('paused-anim');
+    
     clearInterval(displayUpdateId);
     clearInterval(radioTimerId);
     clearInterval(paranormalTimerId);
+    
     staticNoise.pause();
     radioBank.pause();
     window.speechSynthesis.cancel();
+    
     msgEl.textContent = "OFFLINE";
     msgEl.classList.remove('evp-active');
+    
+    window.removeEventListener('devicemotion', handleMotion);
 }
 
 btnToggle.onclick = () => {
+    // "Truco" para desbloquear el audio en navegadores móviles
     const unlockVoice = new SpeechSynthesisUtterance("");
     window.speechSynthesis.speak(unlockVoice);
+    
     if (running) stopRadio(); else startRadio();
 };
 
 btnVisualizer.onclick = () => {
+    // Abrir ventana del osciloscopio
     visualWindow = window.open('visualizer.html', 'SpiritVisualizer', 'width=500,height=600');
 };
 
+// --- MODAL DE INFORMACIÓN ---
 const modal = document.getElementById("infoModal");
-document.getElementById("btnInfo").onclick = () => modal.style.display = "block";
-document.querySelector(".close").onclick = () => modal.style.display = "none";
-window.onclick = (e) => { if (e.target == modal) modal.style.display = "none"; };
+const btnInfo = document.getElementById("btnInfo");
+const spanClose = document.querySelector(".close");
+
+btnInfo.onclick = () => modal.style.display = "block";
+spanClose.onclick = () => modal.style.display = "none";
+window.onclick = (e) => { 
+    if (e.target == modal) modal.style.display = "none"; 
+};
