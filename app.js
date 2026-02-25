@@ -13,16 +13,6 @@ let displayUpdateId = null;
 let phrases = [];
 let isSpeaking = false; 
 
-// --- GESTIÓN DEL ACELERÓMETRO REAL ---
-let currentYAccel = 0;
-
-function handleMotion(event) {
-    if (event.accelerationIncludingGravity) {
-        // Capturamos el eje Y (movimiento arriba/abajo)
-        currentYAccel = event.accelerationIncludingGravity.y;
-    }
-}
-
 // --- MOTOR DE AUDIO ---
 let visualWindow = null;
 let audioCtx, analyser, dataArray;
@@ -48,26 +38,28 @@ function sendDataToVisualizer() {
         for(let i = 0; i < dataArray.length; i++) total += dataArray[i];
         let audioVolume = (total / dataArray.length) * 2;
         
-        // Enviamos volumen y el valor real del acelerómetro
         visualWindow.postMessage({ 
             type: 'AUDIO_UPDATE', 
             volume: audioVolume,
-            isSpeaking: isSpeaking,
-            yAccel: currentYAccel 
+            isSpeaking: isSpeaking 
         }, '*');
     }
 }
 
-// --- LÓGICA DE VOZ ---
+// --- LÓGICA DE VOZ CON PRE-DISTORSIÓN ---
 fetch('phrases.json').then(res => res.json()).then(data => phrases = data.phrases);
 
 function triggerParanormalEvent() {
     if (!running || phrases.length === 0 || isSpeaking) return;
+
     const randomPhrase = phrases[Math.floor(Math.random() * phrases.length)];
+
+    // PASO 1: Iniciar distorsión un segundo antes
     isSpeaking = true; 
     msgEl.classList.add('evp-active');
-    msgEl.textContent = "SINTONIZANDO...";
+    msgEl.textContent = "SINTONIZANDO..."; // Opcional: un mensaje de aviso
 
+    // PASO 2: Esperar 1000ms (1 segundo) antes de que hable la voz
     setTimeout(() => {
         if (running) {
             speakTetric(randomPhrase);
@@ -84,60 +76,22 @@ function speakTetric(text) {
     utter.lang = 'es-ES';
     utter.pitch = 0.1;
     utter.rate = 0.6;
-    utter.onstart = () => { msgEl.textContent = text.toUpperCase(); };
+
+    utter.onstart = () => { 
+        msgEl.textContent = text.toUpperCase(); 
+    };
+    
     utter.onend = () => { 
         isSpeaking = false; 
         msgEl.classList.remove('evp-active'); 
     };
+
     window.speechSynthesis.speak(utter);
 }
 
-// --- CONTROLES Y PERMISOS ---
-async function startRadio() {
-    // Solicitar permisos de movimiento (Necesario en iOS)
-    if (typeof DeviceMotionEvent.requestPermission === 'function') {
-        try {
-            const permission = await DeviceMotionEvent.requestPermission();
-            if (permission === 'granted') {
-                window.addEventListener('devicemotion', handleMotion);
-            }
-        } catch (e) { console.error("Error solicitando sensores:", e); }
-    } else {
-        // En Android/Desktop no suele requerir permiso explícito
-        window.addEventListener('devicemotion', handleMotion);
-    }
-
-    initAudioAnalysis();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    
-    running = true;
-    btnToggle.textContent = "Detener";
-    dialEl.classList.remove('paused-anim');
-    displayUpdateId = setInterval(updateFrequencyDisplay, 50);
-    staticNoise.volume = 0.2;
-    staticNoise.play();
-    radioTimerId = setInterval(playRandomRadioSlice, 12000);
-    paranormalTimerId = setInterval(triggerParanormalEvent, 20000);
-}
-
-function stopRadio() {
-    running = false;
-    isSpeaking = false;
-    btnToggle.textContent = "Iniciar";
-    dialEl.classList.add('paused-anim');
-    clearInterval(displayUpdateId);
-    clearInterval(radioTimerId);
-    clearInterval(paranormalTimerId);
-    staticNoise.pause();
-    radioBank.pause();
-    window.speechSynthesis.cancel();
-    msgEl.textContent = "OFFLINE";
-    msgEl.classList.remove('evp-active');
-    window.removeEventListener('devicemotion', handleMotion);
-}
-
+// --- CONTROLES Y BUCLE ---
 function updateFrequencyDisplay() {
-    if (!running || isSpeaking) {
+    if (!running || isSpeaking) { // Si hay evento paranormal, no movemos los diales
         if(running) sendDataToVisualizer();
         return;
     }
@@ -156,6 +110,37 @@ function playRandomRadioSlice() {
     setTimeout(() => { if (running) radioBank.pause(); }, 800);
 }
 
+function startRadio() {
+    initAudioAnalysis();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    running = true;
+    btnToggle.textContent = "Detener";
+    dialEl.classList.remove('paused-anim');
+    displayUpdateId = setInterval(updateFrequencyDisplay, 50);
+    staticNoise.volume = 0.2;
+    staticNoise.play();
+    
+    radioTimerId = setInterval(playRandomRadioSlice, 12000);
+    
+    // El intervalo ahora llama al EVENTO (que incluye el segundo de espera)
+    paranormalTimerId = setInterval(triggerParanormalEvent, 20000);
+}
+
+function stopRadio() {
+    running = false;
+    isSpeaking = false;
+    btnToggle.textContent = "Iniciar";
+    dialEl.classList.add('paused-anim');
+    clearInterval(displayUpdateId);
+    clearInterval(radioTimerId);
+    clearInterval(paranormalTimerId);
+    staticNoise.pause();
+    radioBank.pause();
+    window.speechSynthesis.cancel();
+    msgEl.textContent = "OFFLINE";
+    msgEl.classList.remove('evp-active');
+}
+
 btnToggle.onclick = () => {
     const unlockVoice = new SpeechSynthesisUtterance("");
     window.speechSynthesis.speak(unlockVoice);
@@ -166,7 +151,6 @@ btnVisualizer.onclick = () => {
     visualWindow = window.open('visualizer.html', 'SpiritVisualizer', 'width=500,height=600');
 };
 
-// Modal info
 const modal = document.getElementById("infoModal");
 document.getElementById("btnInfo").onclick = () => modal.style.display = "block";
 document.querySelector(".close").onclick = () => modal.style.display = "none";
