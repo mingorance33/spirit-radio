@@ -1,6 +1,7 @@
 let running = false;
 const msgEl = document.getElementById("message");
 const btnToggle = document.getElementById("btnToggle");
+const btnVisualizer = document.getElementById("btnVisualizer");
 const staticNoise = document.getElementById("staticNoise");
 const radioBank = document.getElementById("radioBank");
 const dialEl = document.getElementById("dial");
@@ -9,15 +10,21 @@ const dialWrapper = document.querySelector(".dial-wrapper");
 let radioTimerId = null;
 let paranormalTimerId = null;
 let displayUpdateId = null;
+let visualizerInterval = null;
+let visualizerWindow = null;
 let phrases = [];
-let currentUtterance = null; // Referencia global para evitar que el móvil la borre
+let currentUtterance = null;
 
 fetch('phrases.json')
   .then(response => response.json())
   .then(data => phrases = data.phrases);
 
+// Control de ventana externa
+btnVisualizer.addEventListener('click', () => {
+    visualizerWindow = window.open('visualizer.html', 'SpiritVisualizer', 'width=600,height=400');
+});
+
 function updateFrequencyDisplay() {
-  // CRÍTICO: Si el mensaje está en rojo (hablando), NO actualizamos los kHz
   if (!dialEl || !dialWrapper || !running || msgEl.classList.contains('evp-active')) return;
 
   const dialRect = dialEl.getBoundingClientRect();
@@ -29,29 +36,33 @@ function updateFrequencyDisplay() {
   
   const currentFreq = (153.000 + (percent * 128.000)).toFixed(3);
   msgEl.textContent = `${currentFreq} kHz`;
+
+  // Enviar pulso de actualización a la ventana secundaria
+  if (visualizerWindow && !visualizerWindow.closed) {
+      visualizerWindow.postMessage({ type: 'UPDATE' }, '*');
+  }
 }
 
 function speakTetric(text) {
-  // Cancelamos cualquier voz anterior para que no se amontonen en el móvil
   window.speechSynthesis.cancel();
-
   currentUtterance = new SpeechSynthesisUtterance(text);
   currentUtterance.lang = 'es-ES';
   currentUtterance.pitch = 0.4;
   currentUtterance.rate = 0.7;
   
-  // Primero aplicamos el estado visual
   msgEl.classList.add('evp-active');
   msgEl.textContent = text.toUpperCase();
   
-  // Evento cuando termina de hablar
+  // Notificar a la ventana secundaria que hay un EVP activo
+  if (visualizerWindow && !visualizerWindow.closed) {
+      visualizerWindow.postMessage({ type: 'EVP_START' }, '*');
+  }
+  
   currentUtterance.onend = () => {
     msgEl.classList.remove('evp-active');
-  };
-
-  // Por si hay errores en el motor de voz del móvil
-  currentUtterance.onerror = () => {
-    msgEl.classList.remove('evp-active');
+    if (visualizerWindow && !visualizerWindow.closed) {
+        visualizerWindow.postMessage({ type: 'EVP_END' }, '*');
+    }
   };
 
   window.speechSynthesis.speak(currentUtterance);
@@ -70,7 +81,7 @@ function startRadio() {
   btnToggle.textContent = "Detener";
   dialEl.classList.remove('paused-anim');
   
-  displayUpdateId = setInterval(updateFrequencyDisplay, 50);
+  displayUpdateId = setInterval(updateFrequencyDisplay, 80);
   staticNoise.volume = 0.15;
   staticNoise.play().catch(() => {});
   
@@ -88,6 +99,11 @@ function stopRadio() {
   running = false;
   btnToggle.textContent = "Iniciar";
   dialEl.classList.add('paused-anim');
+  
+  if (visualizerWindow && !visualizerWindow.closed) {
+      visualizerWindow.postMessage({ type: 'STOP' }, '*');
+  }
+
   clearInterval(displayUpdateId);
   clearInterval(radioTimerId);
   clearInterval(paranormalTimerId);
@@ -99,17 +115,7 @@ function stopRadio() {
 }
 
 btnToggle.addEventListener("click", () => {
-  // DESBLOQUEO DE VOZ (Truco para móviles)
   const unlock = new SpeechSynthesisUtterance("");
   window.speechSynthesis.speak(unlock);
-
   if (running) stopRadio(); else startRadio();
 });
-
-// Modal
-const modal = document.getElementById("infoModal");
-const btnInfo = document.getElementById("btnInfo");
-const spanClose = document.querySelector(".close");
-btnInfo.onclick = () => modal.style.display = "block";
-spanClose.onclick = () => modal.style.display = "none";
-window.onclick = (e) => { if (e.target == modal) modal.style.display = "none"; };
