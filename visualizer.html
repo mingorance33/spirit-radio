@@ -1,23 +1,10 @@
 <!DOCTYPE html>
-<html lang="es">
+<html>
 <head>
-    <meta charset="UTF-8">
     <title>Scanner Monitor</title>
     <style>
-        body { 
-            background: #000; margin: 0; display: flex; flex-direction: column; 
-            height: 100vh; justify-content: space-around; padding: 40px 20px 20px 20px; 
-            box-sizing: border-box; overflow: hidden; font-family: monospace;
-        }
-        /* Botón de cerrar ventana */
-        #btnClose {
-            position: fixed; top: 10px; right: 10px; 
-            background: #222; color: #ff3333; border: 1px solid #ff3333;
-            width: 30px; height: 30px; cursor: pointer; border-radius: 4px;
-            font-weight: bold; z-index: 100;
-        }
-        #btnClose:hover { background: #ff3333; color: #000; }
-
+        body { background: #000; margin: 0; display: flex; flex-direction: column; height: 100vh; justify-content: space-around; padding: 40px 20px 20px 20px; box-sizing: border-box; overflow: hidden; font-family: monospace; }
+        #btnClose { position: fixed; top: 10px; right: 10px; background: #222; color: #ff3333; border: 1px solid #ff3333; width: 30px; height: 30px; cursor: pointer; border-radius: 4px; font-weight: bold; z-index: 100; }
         .container { position: relative; width: 100%; height: 21%; background: #020202; border: 1px solid #111; border-radius: 4px; }
         canvas { width: 100%; height: 100%; }
         .label { position: absolute; top: 4px; left: 8px; color: #444; font-size: 9px; letter-spacing: 1px; }
@@ -35,20 +22,22 @@
         let vol = 0;
         let t = 0;
         
-        // Recibir datos de la app principal
         window.onmessage = (e) => { 
-            if(e.data.type === 'AUDIO_UPDATE') vol = e.data.volume; 
+            if(e.data.type === 'AUDIO_UPDATE') {
+                // Suavizamos la caída del volumen para que no parpadee brusco
+                vol = e.data.volume; 
+            }
         };
 
         const waves = [
-            { id: 'c1', col: '#ff3333', step: 0.02 },
-            { id: 'c2', col: '#33ff33', step: 0.05 },
-            { id: 'c3', col: '#33aaff', step: 0.03 },
-            { id: 'c4', col: '#ffcc00', step: 0.06 }
+            { id: 'c1', col: '#ff3333', step: 0.02, speed: 0.1 },
+            { id: 'c2', col: '#33ff33', step: 0.05, speed: 0.2 },
+            { id: 'c3', col: '#33aaff', step: 0.03, speed: 0.15 },
+            { id: 'c4', col: '#ffcc00', step: 0.06, speed: 0.25 }
         ];
 
         function render() {
-            t += 0.1;
+            t += 0.15;
             waves.forEach(w => {
                 const canvas = document.getElementById(w.id);
                 const ctx = canvas.getContext('2d');
@@ -58,14 +47,19 @@
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 ctx.beginPath();
                 ctx.strokeStyle = w.col;
-                ctx.lineWidth = 1.5;
-                ctx.shadowBlur = vol / 2;
+                ctx.lineWidth = 2;
+                ctx.shadowBlur = vol / 3;
                 ctx.shadowColor = w.col;
 
                 for(let x=0; x<canvas.width; x++) {
-                    let rand = (Math.random() - 0.5) * (vol * 0.5);
-                    let sine = Math.sin(x * w.step + t) * (10 + vol/2);
-                    let y = (canvas.height/2) + sine + rand;
+                    // Calculamos la agitación de la onda basada en el volumen
+                    let agitation = vol * 0.8;
+                    let baseSine = Math.sin(x * w.step + t * w.speed) * (5 + vol/4);
+                    let jitter = (Math.random() - 0.5) * agitation;
+                    
+                    let y = (canvas.height/2) + baseSine + jitter;
+                    
+                    // Máscara para que los bordes mueran en el centro
                     let mask = Math.sin((x/canvas.width) * Math.PI);
                     y = (canvas.height/2) + (y - canvas.height/2) * mask;
 
@@ -73,6 +67,10 @@
                 }
                 ctx.stroke();
             });
+
+            // Bajamos el volumen artificialmente poco a poco para suavidad
+            vol *= 0.9; 
+
             requestAnimationFrame(render);
         }
         render();
