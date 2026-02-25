@@ -11,9 +11,9 @@ let radioTimerId = null;
 let paranormalTimerId = null;
 let displayUpdateId = null;
 let phrases = [];
-let isSpeaking = false; // Nueva variable para rastrear la voz paranormal
+let isSpeaking = false; 
 
-// --- SISTEMA DE AUDIO ---
+// --- MOTOR DE AUDIO ---
 let visualWindow = null;
 let audioCtx, analyser, dataArray;
 
@@ -21,14 +21,11 @@ function initAudioAnalysis() {
     if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         analyser = audioCtx.createAnalyser();
-        
         const sourceStatic = audioCtx.createMediaElementSource(staticNoise);
         const sourceRadio = audioCtx.createMediaElementSource(radioBank);
-        
         sourceStatic.connect(analyser);
         sourceRadio.connect(analyser);
         analyser.connect(audioCtx.destination);
-        
         analyser.fftSize = 256; 
         dataArray = new Uint8Array(analyser.frequencyBinCount);
     }
@@ -37,50 +34,43 @@ function initAudioAnalysis() {
 function sendDataToVisualizer() {
     if (visualWindow && !visualWindow.closed && running) {
         analyser.getByteFrequencyData(dataArray);
-        
         let total = 0;
         for(let i = 0; i < dataArray.length; i++) total += dataArray[i];
         let audioVolume = (total / dataArray.length) * 2;
         
-        // Si el sistema está hablando una palabra paranormal, forzamos un volumen alto
-        let finalVolume = isSpeaking ? (60 + Math.random() * 40) : audioVolume;
-        
+        // Enviamos volumen real + estado de voz paranormal
         visualWindow.postMessage({ 
             type: 'AUDIO_UPDATE', 
-            volume: finalVolume,
-            isSpeaking: isSpeaking // Avisamos al visualizador que es voz
+            volume: audioVolume,
+            isSpeaking: isSpeaking 
         }, '*');
     }
 }
 
-// --- FUNCIONES DE VOZ ---
+// --- LÓGICA DE VOZ ---
+fetch('phrases.json').then(res => res.json()).then(data => phrases = data.phrases);
+
 function speakTetric(text) {
     window.speechSynthesis.cancel();
     const utter = new SpeechSynthesisUtterance(text);
     utter.lang = 'es-ES';
     utter.pitch = 0.1;
     utter.rate = 0.6;
-
     utter.onstart = () => { 
-        isSpeaking = true; // ACTIVAR REACCIÓN EN OSCILOSCOPIO
+        isSpeaking = true; 
         msgEl.classList.add('evp-active'); 
         msgEl.textContent = text.toUpperCase(); 
     };
-    
     utter.onend = () => { 
-        isSpeaking = false; // DESACTIVAR REACCIÓN
+        isSpeaking = false; 
         msgEl.classList.remove('evp-active'); 
     };
-
     window.speechSynthesis.speak(utter);
 }
 
-// --- LÓGICA DE CONTROL (Mantener igual que antes pero con sendDataToVisualizer) ---
-fetch('phrases.json').then(res => res.json()).then(data => phrases = data.phrases);
-
 function updateFrequencyDisplay() {
     if (!dialEl || !dialWrapper || !running || msgEl.classList.contains('evp-active')) {
-        if(running) sendDataToVisualizer(); // Seguir enviando datos aunque no cambien kHz
+        if(running) sendDataToVisualizer();
         return;
     }
     const dialRect = dialEl.getBoundingClientRect();
@@ -95,7 +85,7 @@ function playRandomRadioSlice() {
     radioBank.currentTime = Math.random() * (radioBank.duration || 10);
     radioBank.volume = 0.8;
     radioBank.play().catch(() => {});
-    setTimeout(() => { if (running) radioBank.pause(); }, 700 + Math.random() * 1000);
+    setTimeout(() => { if (running) radioBank.pause(); }, 800);
 }
 
 function startRadio() {
@@ -130,7 +120,6 @@ function stopRadio() {
 btnToggle.onclick = () => { if (running) stopRadio(); else startRadio(); };
 btnVisualizer.onclick = () => { visualWindow = window.open('visualizer.html', 'SpiritVisualizer', 'width=500,height=600'); };
 
-// Modal
 const modal = document.getElementById("infoModal");
 document.getElementById("btnInfo").onclick = () => modal.style.display = "block";
 document.querySelector(".close").onclick = () => modal.style.display = "none";
