@@ -1,72 +1,63 @@
 <!DOCTYPE html>
-<html lang="es">
+<html>
 <head>
-    <meta charset="UTF-8">
+    <title>Scanner Monitor</title>
     <style>
-        body { background: #000; margin: 0; display: flex; flex-direction: column; height: 100vh; justify-content: space-around; padding: 20px; box-sizing: border-box; }
-        .canvas-item { position: relative; width: 100%; height: 20%; background: #050505; border: 1px solid #111; }
+        body { background: #000; margin: 0; display: flex; flex-direction: column; height: 100vh; justify-content: space-around; padding: 15px; box-sizing: border-box; overflow: hidden;}
+        .container { position: relative; width: 100%; height: 22%; background: #020202; border: 1px solid #111; border-radius: 4px; }
         canvas { width: 100%; height: 100%; }
-        .label { position: absolute; top: 5px; left: 10px; color: #444; font-family: monospace; font-size: 10px; }
+        .label { position: absolute; top: 4px; left: 8px; color: #444; font-family: monospace; font-size: 9px; letter-spacing: 1px; }
     </style>
 </head>
 <body>
-    <div class="canvas-item"><span class="label">RF SCANNER</span><canvas id="c1"></canvas></div>
-    <div class="canvas-item"><span class="label">KINETIC ENERGY</span><canvas id="c2"></canvas></div>
-    <div class="canvas-item"><span class="label">MAGNETIC FIELD</span><canvas id="c3"></canvas></div>
-    <div class="canvas-item"><span class="label">INFRARED</span><canvas id="c4"></canvas></div>
+    <div class="container"><span class="label">RF SPECTRUM</span><canvas id="c1"></canvas></div>
+    <div class="container"><span class="label">KINETIC ENERGY</span><canvas id="c2"></canvas></div>
+    <div class="container"><span class="label">MAGNETIC FIELD</span><canvas id="c3"></canvas></div>
+    <div class="container"><span class="label">INFRARED SENSOR</span><canvas id="c4"></canvas></div>
 
     <script>
-        let currentVolume = 0;
-        let time = 0;
+        let vol = 0;
+        let t = 0;
+        window.onmessage = (e) => { if(e.data.type === 'AUDIO_UPDATE') vol = e.data.volume; };
 
-        window.addEventListener('message', (e) => {
-            if (e.data.type === 'AUDIO_UPDATE') {
-                currentVolume = e.data.volume;
-            }
-        });
-
-        const configs = [
-            { id: 'c1', color: '#ff3333', speed: 0.1 },
-            { id: 'c2', color: '#33ff33', speed: 0.15 },
-            { id: 'c3', color: '#33aaff', speed: 0.08 },
-            { id: 'c4', color: '#ffcc00', speed: 0.12 }
+        const waves = [
+            { id: 'c1', col: '#ff3333', step: 0.02, noise: 5 },
+            { id: 'c2', col: '#33ff33', step: 0.05, noise: 8 },
+            { id: 'c3', col: '#33aaff', step: 0.03, noise: 4 },
+            { id: 'c4', col: '#ffcc00', step: 0.06, noise: 10 }
         ];
 
-        function draw() {
-            time += 0.05;
-            configs.forEach((cfg) => {
-                const canvas = document.getElementById(cfg.id);
+        function render() {
+            t += 0.1;
+            waves.forEach(w => {
+                const canvas = document.getElementById(w.id);
                 const ctx = canvas.getContext('2d');
                 canvas.width = canvas.offsetWidth;
                 canvas.height = canvas.offsetHeight;
 
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 ctx.beginPath();
-                ctx.strokeStyle = cfg.color;
-                ctx.lineWidth = 2;
-                ctx.shadowBlur = 10;
-                ctx.shadowColor = cfg.color;
+                ctx.strokeStyle = w.col;
+                ctx.lineWidth = 1.5;
+                ctx.shadowBlur = vol / 2;
+                ctx.shadowColor = w.col;
 
-                for (let x = 0; x < canvas.width; x++) {
-                    // Mezcla de ondas aleatorias + Reacción al volumen
-                    let noise = Math.sin(x * 0.02 + time * cfg.speed) * 10;
-                    let reaction = (currentVolume / 2) * Math.sin(x * 0.05 + time * 5);
+                for(let x=0; x<canvas.width; x++) {
+                    let rand = (Math.random() - 0.5) * (vol * 0.5);
+                    let sine = Math.sin(x * w.step + t) * (10 + vol/2);
+                    let y = (canvas.height/2) + sine + rand;
                     
-                    // Si no hay volumen, la onda es mínima
-                    let y = (canvas.height / 2) + noise + reaction + (Math.random() * (currentVolume/10));
-
                     // Bordes suaves
-                    let edge = Math.sin((x / canvas.width) * Math.PI);
-                    y = (canvas.height / 2) + (y - canvas.height / 2) * edge;
+                    let mask = Math.sin((x/canvas.width) * Math.PI);
+                    y = (canvas.height/2) + (y - canvas.height/2) * mask;
 
-                    if (x === 0) ctx.moveTo(x, y);
-                    else ctx.lineTo(x, y);
+                    if(x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
                 }
                 ctx.stroke();
             });
-            requestAnimationFrame(draw);
+            requestAnimationFrame(render);
         }
-        draw();
+        render();
     </script>
 </body>
 </html>
