@@ -2,49 +2,70 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Spirit Radio - Análisis Cuántico</title>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; font-family: 'Courier New', monospace; }
+        body { 
+            margin: 0; background: #000; overflow: hidden; 
+            font-family: 'Courier New', monospace;
+            /* Evita que el usuario haga zoom o scroll accidental */
+            touch-action: none; 
+        }
         #container { width: 100vw; height: 100vh; }
         
-        /* BOTÓN DE CIERRE */
-        #btnClose {
-            position: fixed; top: 30px; right: 30px; 
-            background: rgba(255, 0, 0, 0.1); color: #ff3333; 
-            border: 2px solid #ff3333; cursor: pointer;
-            width: 70px; height: 70px; z-index: 9999;
-            border-radius: 50%; font-weight: bold; font-size: 30px;
+        /* CONTENEDOR DE BOTONES SUPERIORES */
+        .top-controls {
+            position: fixed;
+            /* env-safe-area es la clave para que el notch no lo tape */
+            top: calc(20px + env(safe-area-inset-top)); 
+            right: 20px;
+            display: flex;
+            gap: 15px;
+            z-index: 9999;
+        }
+
+        .btn-ui {
+            background: rgba(0, 255, 255, 0.1); color: #0ff; 
+            border: 2px solid #0ff; cursor: pointer;
+            width: 60px; height: 60px;
+            border-radius: 12px; font-weight: bold; font-size: 24px;
             display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 0 15px rgba(255, 0, 0, 0.3);
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
         }
+        
+        #btnClose { border-color: #ff3333; color: #ff3333; }
 
-        /* TEXTO DE ESTADO */
+        /* TEXTO DE ESTADO CON MARGEN DE SEGURIDAD */
         .ui-overlay {
-            position: absolute; top: 35px; left: 30px; color: #0ff;
-            pointer-events: none; text-transform: uppercase; letter-spacing: 3px;
-            font-size: 20px; text-shadow: 0 0 10px #0ff; z-index: 10;
+            position: absolute; 
+            top: calc(30px + env(safe-area-inset-top)); 
+            left: 25px; 
+            color: #0ff;
+            pointer-events: none; text-transform: uppercase; letter-spacing: 2px;
+            font-size: 18px; text-shadow: 0 0 10px #0ff; z-index: 10;
         }
 
-        /* PANELES DE DATOS (NÚMEROS ALTERÁNDOSE) */
         .data-panel {
-            position: absolute; color: rgba(0, 255, 255, 0.5);
-            font-size: 12px; pointer-events: none; z-index: 5;
-            line-height: 1.2; text-shadow: 0 0 5px rgba(0, 255, 255, 0.3);
+            position: absolute; color: rgba(0, 255, 255, 0.4);
+            font-size: 11px; pointer-events: none; z-index: 5;
+            line-height: 1.2;
         }
-        .bottom-left { bottom: 30px; left: 30px; }
-        .bottom-right { bottom: 30px; right: 30px; text-align: right; }
-        .top-center { top: 80px; left: 30px; color: rgba(255, 255, 255, 0.3); }
-
+        .bottom-left { bottom: calc(20px + env(safe-area-inset-bottom)); left: 20px; }
+        .bottom-right { bottom: calc(20px + env(safe-area-inset-bottom)); right: 20px; text-align: right; }
+        
         .highlight { color: #ff3333; font-weight: bold; }
     </style>
 </head>
 <body>
-    <button id="btnClose" onclick="window.close()">X</button>
+    <div class="top-controls">
+        <button id="btnFS" class="btn-ui">⛶</button>
+        <button id="btnClose" class="btn-ui">X</button>
+    </div>
+
     <div class="ui-overlay">DETECTOR: <span id="status">BARRIDO RF</span></div>
     
     <div class="data-panel bottom-left" id="panel1"></div>
     <div class="data-panel bottom-right" id="panel2"></div>
-    <div class="data-panel top-center" id="panel3"></div>
 
     <div id="container"></div>
 
@@ -68,23 +89,33 @@
         let vol = 0, isSpeaking = false, isPaused = true;
         const colors = [0xff4444, 0x44ff44, 0x4488ff, 0xffcc00];
 
-        // Función para generar números aleatorios con muchos decimales
-        function genData() {
-            return (Math.random() * 100).toFixed(8);
-        }
+        // LÓGICA FULLSCREEN
+        const btnFS = document.getElementById('btnFS');
+        btnFS.onclick = () => {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    alert(`Error al intentar pantalla completa: ${err.message}`);
+                });
+                btnFS.innerText = "◂▸";
+            } else {
+                document.exitFullscreen();
+                btnFS.innerText = "⛶";
+            }
+        };
+
+        const btnClose = document.getElementById('btnClose');
+        btnClose.onclick = () => window.close();
+
+        // NÚMEROS ALEATORIOS
+        function genData() { return (Math.random() * 100).toFixed(6); }
 
         function updateDataPanels() {
             if (isPaused) return;
-            
             const p1 = document.getElementById('panel1');
             const p2 = document.getElementById('panel2');
-            const p3 = document.getElementById('panel3');
-
-            const noise = isSpeaking ? "<span class='highlight'>ANOMALÍA DETECTADA</span><br>" : "SENS_ISO: " + genData() + "<br>";
-
-            p1.innerHTML = noise + "EM_FLUX: " + genData() + "<br>V_STAB: " + genData() + "<br>Q_BIT: " + (vol/100).toFixed(10);
-            p2.innerHTML = "RF_GAIN: " + (vol * 1.5).toFixed(4) + "db<br>LATENCY: " + (Math.random()*0.1).toFixed(6) + "ms<br>SPEC_DIST: " + genData();
-            p3.innerHTML = "NODE_" + Math.floor(Math.random()*999) + ": " + genData();
+            const noise = isSpeaking ? "<span class='highlight'>ANOMALÍA</span><br>" : "SENS: " + genData() + "<br>";
+            p1.innerHTML = noise + "EM_F: " + genData() + "<br>VOLT: " + (vol/100).toFixed(4);
+            p2.innerHTML = "GAIN: " + (vol).toFixed(2) + "db<br>LNCY: " + (Math.random()*0.1).toFixed(4);
         }
 
         window.onmessage = (e) => {
@@ -93,15 +124,11 @@
                 vol = e.data.volume || 0;
                 isSpeaking = e.data.isSpeaking;
                 const statusEl = document.getElementById('status');
-                statusEl.innerText = isSpeaking ? "¡ENTIDAD DETECTADA!" : "BARRIDO ACTIVO";
+                statusEl.innerText = isSpeaking ? "¡ENTIDAD!" : "BARRIDO";
                 statusEl.style.color = isSpeaking ? "#ff0000" : "#0ff";
                 updateDataPanels();
             }
-            if(e.data.type === 'STOP_ALL') {
-                isPaused = true;
-                document.getElementById('status').innerText = "OFFLINE";
-                document.getElementById('status').style.color = "#555";
-            }
+            if(e.data.type === 'STOP_ALL') isPaused = true;
         };
 
         function init() {
@@ -110,6 +137,7 @@
             camera.position.z = 5;
 
             renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setPixelRatio(window.devicePixelRatio);
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.getElementById('container').appendChild(renderer.domElement);
 
@@ -119,11 +147,10 @@
             composer.addPass(renderPass);
             composer.addPass(bloomPass);
 
-            // Crear Ondas
             for (let i = 0; i < 4; i++) {
                 const geometry = new THREE.BufferGeometry();
                 const points = [];
-                for (let x = -8; x < 8; x += 0.15) points.push(new THREE.Vector3(x, 0, 0));
+                for (let x = -8; x < 8; x += 0.2) points.push(new THREE.Vector3(x, 0, 0));
                 geometry.setFromPoints(points);
                 const material = new THREE.LineBasicMaterial({ color: colors[i], transparent: true, opacity: 0.6 });
                 const line = new THREE.Line(geometry, material);
@@ -132,9 +159,8 @@
                 waves.push(line);
             }
 
-            // Chispas
-            const sparkGeo = new THREE.SphereGeometry(0.04, 8, 8);
-            for(let i=0; i<60; i++) {
+            const sparkGeo = new THREE.SphereGeometry(0.05, 8, 8);
+            for(let i=0; i<40; i++) {
                 const sparkMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
                 const s = new THREE.Mesh(sparkGeo, sparkMat);
                 s.visible = false;
@@ -150,7 +176,7 @@
                 s.mesh.visible = true;
                 s.life = 1.0;
                 s.mesh.material.color.set(isPara ? 0xff0000 : 0xffffff);
-                const size = isPara ? 4.5 : 1.0;
+                const size = isPara ? 4.0 : 0.8;
                 s.mesh.scale.set(size, size, size);
             }
         }
@@ -177,12 +203,11 @@
                 line.geometry.attributes.position.needsUpdate = true;
             });
 
-            // Colisiones
             for (let i = 0; i < waves.length - 1; i++) {
                 const posA = waves[i].geometry.attributes.position.array;
                 const posB = waves[i+1].geometry.attributes.position.array;
                 for (let j = 0; j < posA.length; j += 3) {
-                    if (Math.abs(posA[j+1] - posB[j+1]) < 0.02 && Math.abs(posA[j+1]) > 0.2) {
+                    if (Math.abs(posA[j+1] - posB[j+1]) < 0.03 && Math.abs(posA[j+1]) > 0.2) {
                         triggerSpark(posA[j], posA[j+1], isSpeaking);
                     }
                 }
@@ -190,16 +215,22 @@
 
             sparks.forEach(s => {
                 if (s.mesh.visible) {
-                    s.life -= isSpeaking ? 0.04 : 0.1;
+                    s.life -= isSpeaking ? 0.05 : 0.12;
                     s.mesh.scale.multiplyScalar(0.92);
                     if (s.life <= 0) s.mesh.visible = false;
                 }
             });
 
             composer.render();
-            // Actualizar datos cada frame para efecto de alta velocidad
-            if(Math.random() > 0.7) updateDataPanels();
+            if(Math.random() > 0.8) updateDataPanels();
         }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        });
 
         init();
         animate();
