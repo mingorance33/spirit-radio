@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Osciloscopio Spirit Radio (PixiJS)</title>
+    <title>Osciloscopio Spirit Radio</title>
     <style>
         body { 
             background: #000; margin: 0; display: flex; flex-direction: column; 
@@ -17,13 +17,15 @@
             font-weight: bold; font-size: 20px; z-index: 100;
         }
 
-        .panel { 
+        .container { 
             position: relative; width: 100%; height: 21%; 
             background: radial-gradient(circle at 50% 0%, #111 0, #020202 40%, #000 100%);
             border: 1px solid #1a1a1a; 
             border-radius: 8px;
             overflow: hidden;
         }
+
+        canvas { width: 100%; height: 100%; display:block; }
 
         .label { 
             position: absolute; 
@@ -37,177 +39,160 @@
             pointer-events: none;
             z-index: 5;
         }
+
+        /* Flash paranormal sobre el panel */
+        .container.paranormal-flash {
+            box-shadow: 0 0 25px 5px #ff00ff88;
+        }
     </style>
 </head>
 <body>
-<button id="btnClose" onclick="window.close()">X</button>
+    <button id="btnClose" onclick="window.close()">X</button>
 
-<div class="panel" data-index="0"><span class="label">RF SPECTRUM</span></div>
-<div class="panel" data-index="1"><span class="label">KINETIC ENERGY</span></div>
-<div class="panel" data-index="2"><span class="label">MAGNETIC FIELD</span></div>
-<div class="panel" data-index="3"><span class="label">INFRARED SENSOR</span></div>
+    <div class="container" data-panel="0"><span class="label">RF SPECTRUM</span><canvas id="c1"></canvas></div>
+    <div class="container" data-panel="1"><span class="label">KINETIC ENERGY</span><canvas id="c2"></canvas></div>
+    <div class="container" data-panel="2"><span class="label">MAGNETIC FIELD</span><canvas id="c3"></canvas></div>
+    <div class="container" data-panel="3"><span class="label">INFRARED SENSOR</span><canvas id="c4"></canvas></div>
 
-<!-- PixiJS (v7 estable) -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.2.4/pixi.min.js"></script>
+    <script>
+        let vol = 0;
+        let t = 0;
+        let isSpeaking = false;
 
-<script>
-let vol = 0;
-let isSpeaking = false;
-let t = 0;
-let paranormalIntensity = 0;
+        // Intensidad extra interna para “pico paranormal”
+        let paranormalIntensity = 0;
 
-// Recibe datos desde app.js
-window.onmessage = (e) => {
-    if (e.data && e.data.type === 'AUDIO_UPDATE') {
-        vol = e.data.volume || 0;
-        const prev = isSpeaking;
-        isSpeaking = !!e.data.isSpeaking;
+        window.onmessage = (e) => { 
+            if(e.data.type === 'AUDIO_UPDATE') {
+                vol = e.data.volume || 0;
+                const prevSpeaking = isSpeaking;
+                isSpeaking = !!e.data.isSpeaking;
 
-        if (!prev && isSpeaking) {
-            paranormalIntensity = 1;   // pico al inicio de cada voz
+                // Cuando empieza a hablar, disparamos pico visual
+                if (!prevSpeaking && isSpeaking) {
+                    paranormalIntensity = 1;
+                    triggerPanelFlash();
+                }
+            }
+        };
+
+        const waves = [
+            { id: 'c1', col: '#ff3333', step: 0.02, speed: 0.12 },
+            { id: 'c2', col: '#33ff33', step: 0.05, speed: 0.20 },
+            { id: 'c3', col: '#33aaff', step: 0.03, speed: 0.16 },
+            { id: 'c4', col: '#ffcc00', step: 0.06, speed: 0.24 }
+        ];
+
+        const containers = Array.from(document.querySelectorAll('.container'));
+
+        function triggerPanelFlash() {
+            containers.forEach(c => {
+                c.classList.add('paranormal-flash');
+                setTimeout(() => c.classList.remove('paranormal-flash'), 200);
+            });
         }
-    }
-};
 
-const panels = Array.from(document.querySelectorAll('.panel'));
-const colors = [0xFF3333, 0x33FF33, 0x33AAFF, 0xFFCC00];
+        function render() {
+            t += 0.15;
 
-const apps = [];
-const waves = [];
+            // Normalizamos volumen a un rango útil (0–1.5 aprox)
+            const baseLevel = Math.min(vol / 80, 1.5);
 
-// Crear una app Pixi por panel
-panels.forEach((panel, idx) => {
-    const app = new PIXI.Application({
-        width: panel.clientWidth,
-        height: panel.clientHeight,
-        backgroundAlpha: 0,
-        antialias: true
-    });
-    panel.appendChild(app.view);
-    apps.push(app);
+            waves.forEach((w, idx) => {
+                const canvas = document.getElementById(w.id);
+                if(!canvas) return;
+                const ctx = canvas.getContext('2d');
 
-    // Redimensionar al cambiar la ventana
-    window.addEventListener('resize', () => {
-        app.renderer.resize(panel.clientWidth, panel.clientHeight);
-    });
+                const wWidth = canvas.offsetWidth;
+                const wHeight = canvas.offsetHeight;
+                if (wWidth === 0 || wHeight === 0) return;
 
-    const wave = new PIXI.Graphics();
-    const glow = new PIXI.filters.BlurFilter(0, 1);
-    wave.filters = [glow];
+                // Ajuste real de tamaño del canvas
+                if (canvas.width !== wWidth) canvas.width = wWidth;
+                if (canvas.height !== wHeight) canvas.height = wHeight;
 
-    app.stage.addChild(wave);
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    waves.push({
-        app,
-        gfx: wave,
-        glow,
-        color: colors[idx],
-        step: [0.02,0.05,0.03,0.06][idx],
-        speed: [0.12,0.20,0.16,0.24][idx],
-        baseAmp: [1.0,0.9,0.8,0.7][idx]
-    });
-});
+                // Fondo tenue tipo “scan”
+                const grad = ctx.createLinearGradient(0, 0, canvas.width, 0);
+                grad.addColorStop(0, 'rgba(0,0,0,0.75)');
+                grad.addColorStop(0.5, 'rgba(10,10,10,0.9)');
+                grad.addColorStop(1, 'rgba(0,0,0,0.75)');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-// Función de dibujo de una onda
-function drawWave(w) {
-    const app = w.app;
-    const gfx = w.gfx;
+                ctx.beginPath();
+                ctx.strokeStyle = w.col;
 
-    const width  = app.renderer.width;
-    const height = app.renderer.height;
-    if (!width || !height) return;
+                // Grosor y glow dependen de radio/paranormal
+                const lineBase = 1.5 + baseLevel * 1.5;
+                const lineBoost = isSpeaking ? 2.5 : 0;
+                ctx.lineWidth = lineBase + lineBoost;
 
-    // Volumen medio normalizado (más sensible)
-    // Si está hablando, forzamos un volumen alto para que la animación no muera
-let effectiveVol = vol;
-if (isSpeaking && effectiveVol < 80) {
-    effectiveVol = 80;
-}
-const baseLevel = Math.min(Math.max(effectiveVol, 5) / 30, 2.0);
+                const glowBase = 5 + baseLevel * 15;
+                const glowBoost = paranormalIntensity * 25;
+                ctx.shadowBlur = glowBase + glowBoost;
+                ctx.shadowColor = isSpeaking ? '#ff00ff' : w.col;
 
+                // Shake paranormal
+                const shakeAmp = isSpeaking ? 4 * (0.3 + paranormalIntensity) : 0;
 
-    const amplitude =
-        10 * w.baseAmp +
-        baseLevel * 25 * w.baseAmp +      // radio
-        (isSpeaking ? 25 * w.baseAmp : 0); // voz paranormal extra
+                for(let x = 0; x < canvas.width; x++) {
+                    const progress = x / canvas.width;
 
-    const glowBase  = 5 + baseLevel * 10;     // radio
-    const glowBoost = paranormalIntensity * 35; // pico paranormal
-    w.glow.blur = glowBase + glowBoost;
+                    // Amplitud base por sensor
+                    const sensorBase =
+                        idx === 0 ? 1.0 : // RF
+                        idx === 1 ? 0.9 : // Kinetic
+                        idx === 2 ? 0.8 : // Magnetic
+                                    0.7;  // Infrared
 
-    const lineBase  = 1.5 + baseLevel * 1.2;
-    const lineBoost = isSpeaking ? 3.5 : 0;
-    const lineWidth = lineBase + lineBoost;
+                    // Amplitud ligada al volumen + pequeño ruido
+                    const amplitude =
+                        10 * sensorBase +
+                        baseLevel * 25 * sensorBase +
+                        (isSpeaking ? 10 * sensorBase : 0);
 
-    const shakeAmp = isSpeaking ? 6 * (0.3 + paranormalIntensity) : 0;
+                    const baseSine = Math.sin(x * w.step + t * w.speed) * amplitude;
 
-    gfx.clear();
+                    // Jitter radio/paranormal
+                    const jitterRadio = (Math.random() - 0.5) * baseLevel * 10;
+                    const jitterPara  = (Math.random() - 0.5) * paranormalIntensity * 35;
+                    let jitter = jitterRadio + jitterPara;
 
-    const col = isSpeaking
-        ? PIXI.utils.mixColors(w.color, 0xFF00FF, 0.6) // magenta al hablar
-        : w.color;
+                    // Más actividad hacia el centro
+                    const mask = Math.sin(progress * Math.PI);
+                    let y = (canvas.height / 2) + (baseSine + jitter) * mask;
 
-    gfx.lineStyle(lineWidth, col, 1);
+                    // Shake global
+                    const shakeX = (Math.random() - 0.5) * shakeAmp;
+                    const drawX = x + shakeX;
 
-    const points = [];
-    for (let x = 0; x < width; x++) {
-        const progress = x / width;
-        const baseSine = Math.sin(x * w.step + t * w.speed) * amplitude;
+                    if (x === 0) ctx.moveTo(drawX, y);
+                    else ctx.lineTo(drawX, y);
+                }
 
-        const jitterRadio = (Math.random() - 0.5) * baseLevel * 10;
-        const jitterPara  = (Math.random() - 0.5) * paranormalIntensity * 35;
-        const jitter = jitterRadio + jitterPara;
+                ctx.stroke();
 
-        const mask = Math.sin(progress * Math.PI);
-        let y = (height / 2) + (baseSine + jitter) * mask;
+                // Scan-line tenue
+                ctx.shadowBlur = 0;
+                ctx.globalAlpha = 0.4;
+                ctx.fillStyle = 'rgba(255,255,255,0.08)';
+                const scanY = (t * 8 + idx * 30) % canvas.height;
+                ctx.fillRect(0, scanY, canvas.width, 2);
+                ctx.globalAlpha = 1;
+            });
 
-        const shakeX = (Math.random() - 0.5) * shakeAmp;
-        const drawX  = x + shakeX;
+            // Decaimiento suave del pico paranormal
+            paranormalIntensity *= 0.90;
+            if (!isSpeaking) {
+                vol *= 0.90;
+            }
 
-        points.push(drawX, y);
-    }
-
-    if (points.length >= 4) {
-        gfx.moveTo(points[0], points[1]);
-        for (let i = 2; i < points.length; i += 2) {
-            gfx.lineTo(points[i], points[i + 1]);
+            requestAnimationFrame(render);
         }
-    }
 
-    // Scan-line tenue
-    gfx.lineStyle(0);
-    gfx.beginFill(0xFFFFFF, 0.08);
-    const scanY = (t * 8 + (app.__scanOffset || 0)) % height;
-    gfx.drawRect(0, scanY, width, 2);
-    gfx.endFill();
-}
-
-// Offset distinto para cada panel
-apps.forEach((app, idx) => {
-    app.__scanOffset = idx * 30;
-});
-
-// TEST: si no llegan datos aún, simular volumen para que veas algo
-setInterval(() => {
-    if (vol === 0 && !isSpeaking) {
-        vol = 80; // valor medio para tener ondas visibles
-    }
-}, 500);
-
-// Bucle principal (usa el ticker del primer app)
-apps[0].ticker.add((delta) => {
-    t += 0.15 * delta;
-
-    waves.forEach(drawWave);
-
-   paranormalIntensity *= 0.90;
-// Solo dejamos caer el volumen cuando NO habla;
-// mientras habla, mantenemos el nivel para no “congelar” la onda
-if (!isSpeaking) {
-    vol *= 0.95;
-}
-
-});
-</script>
+        render();
+    </script>
 </body>
 </html>
