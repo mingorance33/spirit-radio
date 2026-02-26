@@ -160,6 +160,10 @@ function stopRadio() {
     clearTimeout(radioTimerId);
     staticNoise.pause();
     radioBank.pause();
+    // Añadimos esta línea para avisar al visualizador
+    if (visualWindow && !visualWindow.closed) {
+        visualWindow.postMessage({ type: 'STOP_ALL' }, '*');
+    }
     window.speechSynthesis.cancel();
     msgEl.textContent = "OFFLINE";
     msgEl.classList.remove('evp-active');
