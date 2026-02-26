@@ -1,9 +1,7 @@
 /**
  * @file app.js
- * @author José A. Vázquez Mingorance
- * @date 26-02-2025
- * @description Lógica principal de la Spirit Radio LW con efectos 
- * de audio paranormal y sincronización con el visualizador.
+ * @description Versión Blindada: Filtro de audio con recuperación automática
+ * para evitar ruidos fijos y bloqueos.
  */
 
 let running = false;
@@ -18,7 +16,7 @@ const dialWrapper = document.querySelector(".dial-wrapper");
 let radioTimerId = null;
 let paranormalTimerId = null;
 let displayUpdateId = null;
-let phrases = ["ESTOY AQUÍ", "TE ESCUCHO", "CORRE", "AYUDA", "NO TE VAYAS", "LUZ", "FRÍO"];
+let phrases = ["ESTOY AQUÍ", "TE ESCUCHO", "CORRE", "AYUDA", "NO TE VAYAS", "LUZ", "FRÍO", "DÉJAME", "SÍGUEME"];
 let isSpeaking = false; 
 
 // --- MOTOR DE AUDIO Y FILTROS ---
@@ -30,15 +28,14 @@ function initAudioAnalysis() {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         analyser = audioCtx.createAnalyser();
         
-        // Cambio 1: Filtro de audio para distorsión paranormal
         biquadFilter = audioCtx.createBiquadFilter();
         biquadFilter.type = "lowpass";
+        // Iniciamos en 20kHz (abierto total)
         biquadFilter.frequency.setValueAtTime(20000, audioCtx.currentTime); 
 
         const sourceStatic = audioCtx.createMediaElementSource(staticNoise);
         const sourceRadio = audioCtx.createMediaElementSource(radioBank);
         
-        // Conexión en cadena: Fuentes -> Filtro -> Analizador -> Altavoces
         sourceStatic.connect(biquadFilter);
         sourceRadio.connect(biquadFilter);
         biquadFilter.connect(analyser);
@@ -62,28 +59,18 @@ function sendDataToVisualizer() {
     }
 }
 
-// --- LÓGICA DE EVENTOS ---
-
-function playRandomRadioSlice() {
-    if (!running) return;
-    const duration = radioBank.duration;
-    if (duration) {
-        radioBank.currentTime = Math.random() * duration;
-        radioBank.play();
-        const nextSlice = 2000 + Math.random() * 5000;
-        radioTimerId = setTimeout(playRandomRadioSlice, nextSlice);
-    }
-}
+// --- LÓGICA DE EVENTOS PARANORMALES ---
 
 function triggerParanormalEvent() {
-    if (!running || isSpeaking || Math.random() > 0.4) return;
+    // Aumentamos probabilidad para pruebas: 0.5
+    if (!running || isSpeaking || Math.random() > 0.5) return;
 
     isSpeaking = true;
     msgEl.classList.add('evp-active');
     
-    // Aplicamos distorsión al audio de fondo (ruido sordo)
+    // Suavizamos la caída del filtro para evitar el "pop" o ruido extraño
     if(biquadFilter) {
-        biquadFilter.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.5);
+        biquadFilter.frequency.setTargetAtTime(500, audioCtx.currentTime, 0.1);
     }
 
     const phrase = phrases[Math.floor(Math.random() * phrases.length)];
@@ -91,19 +78,40 @@ function triggerParanormalEvent() {
 
     const utterance = new SpeechSynthesisUtterance(phrase);
     utterance.lang = 'es-ES';
-    utterance.rate = 0.6;
+    utterance.rate = 0.7; // Un poco más rápido para evitar bloqueos
     utterance.pitch = 0.1;
 
-    utterance.onend = () => {
+    // SEGURO DE VIDA: Si a los 5 segundos no ha terminado la voz, reseteamos manual
+    const safetyReset = setTimeout(() => {
+        if (isSpeaking) resetNormalAudio();
+    }, 5000);
+
+    function resetNormalAudio() {
         isSpeaking = false;
         msgEl.classList.remove('evp-active');
-        // Restauramos el audio normal (agudos)
+        clearTimeout(safetyReset);
         if(biquadFilter) {
-            biquadFilter.frequency.exponentialRampToValueAtTime(20000, audioCtx.currentTime + 1);
+            biquadFilter.frequency.setTargetAtTime(20000, audioCtx.currentTime, 0.2);
         }
-    };
+    }
+
+    utterance.onend = resetNormalAudio;
+    utterance.onerror = resetNormalAudio;
 
     window.speechSynthesis.speak(utterance);
+}
+
+// --- CONTROL DE LA RADIO ---
+
+function playRandomRadioSlice() {
+    if (!running) return;
+    const duration = radioBank.duration;
+    if (duration) {
+        radioBank.currentTime = Math.random() * duration;
+        radioBank.play().catch(e => console.log("Audio play blocked"));
+        const nextSlice = 1500 + Math.random() * 3000;
+        radioTimerId = setTimeout(playRandomRadioSlice, nextSlice);
+    }
 }
 
 function startRadio() {
@@ -114,7 +122,7 @@ function startRadio() {
     initAudioAnalysis();
     if (audioCtx.state === 'suspended') audioCtx.resume();
     
-    staticNoise.play();
+    staticNoise.play().catch(e => console.log("Static blocked"));
     
     displayUpdateId = setInterval(() => {
         if (!isSpeaking && running) {
@@ -127,7 +135,7 @@ function startRadio() {
     }, 50);
     
     playRandomRadioSlice();
-    paranormalTimerId = setInterval(triggerParanormalEvent, 10000); 
+    paranormalTimerId = setInterval(triggerParanormalEvent, 8000); // Intento cada 8s
 }
 
 function stopRadio() {
@@ -144,7 +152,9 @@ function stopRadio() {
     radioBank.pause();
     window.speechSynthesis.cancel();
     
-    // Notificamos al visualizador que se detenga
+    // Resetear filtro al apagar para evitar que se quede sordo al reiniciar
+    if(biquadFilter) biquadFilter.frequency.setValueAtTime(20000, audioCtx.currentTime);
+
     if (visualWindow && !visualWindow.closed) {
         visualWindow.postMessage({ type: 'STOP_ALL' }, '*');
     }
@@ -166,8 +176,8 @@ const modal = document.getElementById("infoModal");
 const btnInfo = document.getElementById("btnInfo");
 const spanClose = document.getElementsByClassName("close")[0];
 
-btnInfo.onclick = () => modal.style.display = "block";
-spanClose.onclick = () => modal.style.display = "none";
+if(btnInfo) btnInfo.onclick = () => modal.style.display = "block";
+if(spanClose) spanClose.onclick = () => modal.style.display = "none";
 window.onclick = (event) => {
     if (event.target == modal) modal.style.display = "none";
 };
