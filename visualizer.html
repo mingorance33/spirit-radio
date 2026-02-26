@@ -2,25 +2,19 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Spirit Radio - Ultra Visualizer</title>
+    <title>Espectro Spirit Radio - Pro</title>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; font-family: 'Courier New', monospace; }
-        #container { width: 100vw; height: 100vh; }
-        .ui-overlay {
-            position: absolute; top: 15px; left: 15px; color: #0ff;
-            pointer-events: none; text-transform: uppercase; letter-spacing: 2px;
-            font-size: 11px; text-shadow: 0 0 8px #0ff; z-index: 10;
-        }
-        #btnClose {
-            position: fixed; top: 10px; right: 10px; background: rgba(0,0,0,0.5);
-            color: #ff3333; border: 1px solid #ff3333; cursor: pointer;
-            padding: 8px 12px; z-index: 100; border-radius: 4px;
+        body { margin: 0; background: #000; overflow: hidden; }
+        #container { width: 100vw; height: 100vh; cursor: none; }
+        .ui {
+            position: absolute; top: 10px; left: 10px; color: #0ff;
+            font-family: monospace; font-size: 10px; letter-spacing: 1px;
+            text-shadow: 0 0 5px #0ff; pointer-events: none;
         }
     </style>
 </head>
 <body>
-    <button id="btnClose" onclick="window.close()">X</button>
-    <div class="ui-overlay">SISTEMA: <span id="status">BARRIDO ACTIVO</span></div>
+    <div class="ui">SISTEMA DE ANÁLISIS ESPECTRAL V1.0</div>
     <div id="container"></div>
 
     <script type="importmap">
@@ -38,50 +32,47 @@
         import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
         import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
-        let scene, camera, renderer, composer;
-        let waves = [];
+        let scene, camera, renderer, composer, waves = [];
         let vol = 0, isSpeaking = false;
-        const defaultColors = [0xff3333, 0x33ff33, 0x33aaff, 0xffcc00];
+        const colors = [0xff4444, 0x44ff44, 0x4488ff, 0xffcc00];
 
         window.onmessage = (e) => {
             if(e.data.type === 'AUDIO_UPDATE') {
                 vol = e.data.volume || 0;
                 isSpeaking = e.data.isSpeaking;
-                document.getElementById('status').innerText = isSpeaking ? "EVP DETECTADO" : "BARRIDO RF";
             }
         };
 
         function init() {
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.z = 5;
+            camera.position.z = 4;
 
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             document.getElementById('container').appendChild(renderer.domElement);
 
-            const renderScene = new RenderPass(scene, camera);
-            const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 2.5, 0.4, 0.1);
+            const renderPass = new RenderPass(scene, camera);
+            const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 3.0, 0.5, 0.15);
             composer = new EffectComposer(renderer);
-            composer.addPass(renderScene);
+            composer.addPass(renderPass);
             composer.addPass(bloomPass);
 
             for (let i = 0; i < 4; i++) {
                 const geometry = new THREE.BufferGeometry();
                 const points = [];
-                for (let x = -7; x < 7; x += 0.05) points.push(new THREE.Vector3(x, 0, 0));
+                for (let x = -8; x < 8; x += 0.05) points.push(new THREE.Vector3(x, 0, 0));
                 geometry.setFromPoints(points);
                 
-                const material = new THREE.LineBasicMaterial({ color: defaultColors[i], transparent: true, opacity: 0.9 });
+                const material = new THREE.LineBasicMaterial({ color: colors[i], transparent: true, opacity: 0.8 });
                 const line = new THREE.Line(geometry, material);
-                line.position.y = 2 - (i * 1.3);
+                line.position.y = 1.8 - (i * 1.2);
                 
-                // DATA PERSONALIZADA PARA CADA ONDA
+                // Configuración para el efecto del vídeo:
                 line.userData = { 
-                    fStep: Math.random() * 1000, // Paso de frecuencia
-                    aStep: Math.random() * 1000, // Paso de amplitud
-                    speed: 0.002 + (Math.random() * 0.005)
+                    f: Math.random() * 10,  // fase inicial
+                    fV: 0.02 + Math.random() * 0.05, // velocidad de cambio de frecuencia
+                    aV: 0.01 + Math.random() * 0.03  // velocidad de cambio de amplitud
                 };
                 
                 scene.add(line);
@@ -91,48 +82,41 @@
 
         function animate() {
             requestAnimationFrame(animate);
-            const time = Date.now();
+            const t = Date.now() * 0.001;
 
             waves.forEach((line, i) => {
-                const positions = line.geometry.attributes.position.array;
-                
-                // EVOLUCIÓN ALEATORIA DE LA ONDA
-                line.userData.fStep += 0.005;
-                line.userData.aStep += 0.007;
+                const pos = line.geometry.attributes.position.array;
+                const ud = line.userData;
 
-                // Calculamos la frecuencia (longitud de onda) dinámicamente
-                // Esto hace que la onda se "estire" y "encoja" sola
-                const dynamicFreq = (1.5 + i) + Math.sin(line.userData.fStep) * 2.0;
-                
-                // Calculamos la amplitud (altura) dinámica
-                const dynamicAmp = (vol * 0.08) + 0.1 + (Math.abs(Math.cos(line.userData.aStep)) * 0.3);
+                // Variación de color dinámica (Flash blanco)
+                const targetColor = new THREE.Color(isSpeaking ? 0xffffff : colors[i]);
+                line.material.color.lerp(targetColor, 0.15);
 
-                // Gestión de Color (Blanco si habla, original si no)
-                const targetColor = new THREE.Color(isSpeaking ? 0xffffff : defaultColors[i]);
-                line.material.color.lerp(targetColor, 0.1);
+                // --- LÓGICA DE INESTABILIDAD TIPO VÍDEO ---
+                // La frecuencia cambia sola usando una función de seno desfasada
+                const currentFreq = (2 + i) + Math.sin(t * 2 + i) * 1.5;
+                // La amplitud base tiene un "temblor" constante
+                const currentAmp = (vol * 0.1) + 0.15 + (Math.sin(t * 3 + i) * 0.2);
 
-                for (let j = 0; j < positions.length; j += 3) {
-                    const x = positions[j];
+                for (let j = 0; j < pos.length; j += 3) {
+                    const x = pos[j];
                     
-                    let f = dynamicFreq;
-                    let a = dynamicAmp;
+                    // Modificador de longitud de onda por punto (crea el efecto de "serpiente")
+                    const waveX = x * currentFreq + (t * (3 + i));
+                    
+                    // Mezclamos dos senos para romper la simetría perfecta
+                    let y = Math.sin(waveX) * currentAmp;
+                    y += Math.sin(waveX * 0.5) * (currentAmp * 0.3); 
 
                     if (isSpeaking) {
-                        f *= 2.5; // Frecuencia frenética cuando hay entidad
-                        a += 0.5;
-                        positions[j + 1] += (Math.random() - 0.5) * 0.12; // Jitter/Glitch
+                        // Distorsión agresiva si hay voz
+                        y += (Math.random() - 0.5) * 0.4; 
                     }
 
-                    // Máscara de bordes (fade out lateral)
-                    const mask = Math.pow(Math.cos(x / 5), 2);
-                    
-                    // Función de onda final
-                    const newY = Math.sin(x * f + (time * line.userData.speed)) * a * mask;
-                    
-                    // Suavizado de transición de posición (para que no vibre feo)
-                    positions[j + 1] = THREE.MathUtils.lerp(positions[j + 1], newY, 0.2);
+                    // Atenuación en los bordes
+                    const mask = Math.cos(x / 5.5);
+                    pos[j + 1] = THREE.MathUtils.lerp(pos[j + 1], y * mask, 0.3);
                 }
-                
                 line.geometry.attributes.position.needsUpdate = true;
             });
 
