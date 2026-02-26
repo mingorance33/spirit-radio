@@ -2,12 +2,11 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Spirit Radio - Detección Paranormal Crítica</title>
+    <title>Spirit Radio - Espectro Sincronizado</title>
     <style>
         body { margin: 0; background: #000; overflow: hidden; font-family: 'Courier New', monospace; }
         #container { width: 100vw; height: 100vh; }
         
-        /* Botón de cierre garantizado */
         #btnClose {
             position: fixed; top: 20px; right: 20px; 
             background: rgba(20, 0, 0, 0.6); color: #ff3333; 
@@ -15,9 +14,7 @@
             width: 45px; height: 45px; z-index: 9999;
             border-radius: 50%; font-weight: bold; font-size: 20px;
             display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 0 10px rgba(255,0,0,0.5);
         }
-        #btnClose:hover { background: #ff3333; color: #000; }
 
         .ui-overlay {
             position: absolute; top: 20px; left: 20px; color: #0ff;
@@ -28,7 +25,7 @@
 </head>
 <body>
     <button id="btnClose" onclick="window.close()">X</button>
-    <div class="ui-overlay">ESTADO: <span id="status">VIGILANCIA</span></div>
+    <div class="ui-overlay">SISTEMA: <span id="status">ESPERANDO INICIO...</span></div>
     <div id="container"></div>
 
     <script type="importmap">
@@ -48,17 +45,21 @@
 
         let scene, camera, renderer, composer, waves = [];
         let sparks = [];
-        let vol = 0, isSpeaking = false;
+        let vol = 0, isSpeaking = false, isPaused = true;
         const colors = [0xff4444, 0x44ff44, 0x4488ff, 0xffcc00];
 
-        // Escucha mensajes de app.js
         window.onmessage = (e) => {
             if(e.data.type === 'AUDIO_UPDATE') {
+                isPaused = false; // Reanudar si llegan datos
                 vol = e.data.volume || 0;
                 isSpeaking = e.data.isSpeaking;
-                const statusEl = document.getElementById('status');
-                statusEl.innerText = isSpeaking ? "¡ENTIDAD DETECTADA!" : "BARRIDO RF";
-                statusEl.style.color = isSpeaking ? "#ff0000" : "#0ff";
+                document.getElementById('status').innerText = isSpeaking ? "¡ENTIDAD DETECTADA!" : "BARRIDO ACTIVO";
+                document.getElementById('status').style.color = isSpeaking ? "#ff0000" : "#0ff";
+            }
+            if(e.data.type === 'STOP_ALL') {
+                isPaused = true; // Congelar visualizador
+                document.getElementById('status').innerText = "CONGELADO - OFFLINE";
+                document.getElementById('status').style.color = "#555";
             }
         };
 
@@ -71,14 +72,12 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.getElementById('container').appendChild(renderer.domElement);
 
-            const renderPass = new RenderPass(scene, camera);
-            // Bloom potente para resaltar los destellos rojos
-            const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 2.8, 0.4, 0.1);
+            const renderScene = new RenderPass(scene, camera);
+            const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 2.5, 0.4, 0.1);
             composer = new EffectComposer(renderer);
-            composer.addPass(renderPass);
+            composer.addPass(renderScene);
             composer.addPass(bloomPass);
 
-            // Crear 4 Ondas en el mismo plano central
             for (let i = 0; i < 4; i++) {
                 const geometry = new THREE.BufferGeometry();
                 const points = [];
@@ -86,15 +85,13 @@
                 geometry.setFromPoints(points);
                 const material = new THREE.LineBasicMaterial({ color: colors[i], transparent: true, opacity: 0.7 });
                 const line = new THREE.Line(geometry, material);
-                line.position.y = 0; 
                 line.userData = { fStep: Math.random()*50, aStep: Math.random()*50, speed: 0.003 + (i*0.001) };
                 scene.add(line);
                 waves.push(line);
             }
 
-            // Pool de chispas aumentado para cubrir colisiones masivas
             const sparkGeo = new THREE.SphereGeometry(0.04, 8, 8);
-            for(let i=0; i<80; i++) {
+            for(let i=0; i<60; i++) {
                 const sparkMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
                 const s = new THREE.Mesh(sparkGeo, sparkMat);
                 s.visible = false;
@@ -109,22 +106,23 @@
                 s.mesh.position.set(x, y, 0);
                 s.mesh.visible = true;
                 s.life = 1.0;
-                
-                if (isParanormal) {
-                    s.mesh.material.color.set(0xff0000); // Rojo
-                    s.mesh.scale.set(4.5, 4.5, 4.5);    // 3 veces más grande (1.5 * 3)
-                } else {
-                    s.mesh.material.color.set(0xffffff); // Blanco
-                    s.mesh.scale.set(1.5, 1.5, 1.5);    // Tamaño normal
-                }
+                s.mesh.material.color.set(isParanormal ? 0xff0000 : 0xffffff);
+                const size = isParanormal ? 4.5 : 1.5;
+                s.mesh.scale.set(size, size, size);
             }
         }
 
         function animate() {
             requestAnimationFrame(animate);
+            
+            // SI ESTÁ PAUSADO, NO ACTUALIZAMOS NADA (Efecto congelado)
+            if (isPaused) {
+                composer.render(); // Renderizar frame estático
+                return; 
+            }
+
             const t = Date.now();
 
-            // Actualizar Ondas
             waves.forEach((line, i) => {
                 const pos = line.geometry.attributes.position.array;
                 line.userData.fStep += 0.012;
@@ -137,37 +135,29 @@
                     const x = pos[j];
                     const mask = Math.cos(x / 5.5);
                     let y = Math.sin(x * freq + (t * line.userData.speed)) * amp * mask;
-                    
                     if (isSpeaking) y += (Math.random() - 0.5) * 0.4;
                     pos[j + 1] = THREE.MathUtils.lerp(pos[j + 1], y, 0.2);
                 }
                 line.geometry.attributes.position.needsUpdate = true;
                 
-                // Transición de color de la línea
                 const targetColor = new THREE.Color(isSpeaking ? 0xffffff : colors[i]);
                 line.material.color.lerp(targetColor, 0.1);
             });
 
-            // DETECCIÓN DE COLISIONES ENTRE TODAS LAS ONDAS
+            // Colisiones
             for (let i = 0; i < waves.length - 1; i++) {
                 const posA = waves[i].geometry.attributes.position.array;
                 const posB = waves[i+1].geometry.attributes.position.array;
-
                 for (let j = 0; j < posA.length; j += 3) {
-                    // Si los puntos de dos ondas están muy cerca
-                    if (Math.abs(posA[j+1] - posB[j+1]) < 0.03) {
-                        // Solo marcar si hay movimiento (amplitud > 0.1)
-                        if (Math.abs(posA[j+1]) > 0.1) {
-                            triggerSpark(posA[j], posA[j+1], isSpeaking);
-                        }
+                    if (Math.abs(posA[j+1] - posB[j+1]) < 0.03 && Math.abs(posA[j+1]) > 0.1) {
+                        triggerSpark(posA[j], posA[j+1], isSpeaking);
                     }
                 }
             }
 
-            // Animar chispas
             sparks.forEach(s => {
                 if (s.mesh.visible) {
-                    s.life -= isSpeaking ? 0.04 : 0.08; // Duran un poco más si es paranormal
+                    s.life -= isSpeaking ? 0.04 : 0.08;
                     s.mesh.scale.multiplyScalar(0.92);
                     if (s.life <= 0) s.mesh.visible = false;
                 }
