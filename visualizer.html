@@ -19,86 +19,179 @@
 
         .container { 
             position: relative; width: 100%; height: 21%; 
-            background: #020202; border: 1px solid #1a1a1a; 
+            background: radial-gradient(circle at 50% 0%, #111 0, #020202 40%, #000 100%);
+            border: 1px solid #1a1a1a; 
             border-radius: 8px;
+            overflow: hidden;
         }
 
-        canvas { width: 100%; height: 100%; }
+        canvas { width: 100%; height: 100%; display:block; }
 
-        /* AJUSTE DE TEXTOS: El doble de tamaño y más visibles */
         .label { 
             position: absolute; 
             top: 8px; 
             left: 12px; 
-            color: #888; /* Color más claro para que se vea mejor */
-            font-size: 18px; /* Antes era 9px, ahora es el doble+ */
+            color: #bbb;
+            font-size: 18px;
             font-weight: bold;
             letter-spacing: 2px; 
-            text-shadow: 1px 1px 2px #000; /* Sombra para resaltar sobre la onda */
-            pointer-events: none; /* Para que no moleste al tocar */
+            text-shadow: 1px 1px 3px #000; 
+            pointer-events: none;
             z-index: 5;
+        }
+
+        /* Flash paranormal sobre el panel */
+        .container.paranormal-flash {
+            box-shadow: 0 0 25px 5px #ff00ff88;
         }
     </style>
 </head>
 <body>
     <button id="btnClose" onclick="window.close()">X</button>
 
-    <div class="container"><span class="label">RF SPECTRUM</span><canvas id="c1"></canvas></div>
-    <div class="container"><span class="label">KINETIC ENERGY</span><canvas id="c2"></canvas></div>
-    <div class="container"><span class="label">MAGNETIC FIELD</span><canvas id="c3"></canvas></div>
-    <div class="container"><span class="label">INFRARED SENSOR</span><canvas id="c4"></canvas></div>
+    <div class="container" data-panel="0"><span class="label">RF SPECTRUM</span><canvas id="c1"></canvas></div>
+    <div class="container" data-panel="1"><span class="label">KINETIC ENERGY</span><canvas id="c2"></canvas></div>
+    <div class="container" data-panel="2"><span class="label">MAGNETIC FIELD</span><canvas id="c3"></canvas></div>
+    <div class="container" data-panel="3"><span class="label">INFRARED SENSOR</span><canvas id="c4"></canvas></div>
 
     <script>
         let vol = 0;
         let t = 0;
         let isSpeaking = false;
 
+        // Intensidad extra interna para “pico paranormal”
+        let paranormalIntensity = 0;
+
         window.onmessage = (e) => { 
             if(e.data.type === 'AUDIO_UPDATE') {
-                vol = e.data.volume;
-                isSpeaking = e.data.isSpeaking;
+                vol = e.data.volume || 0;
+                const prevSpeaking = isSpeaking;
+                isSpeaking = !!e.data.isSpeaking;
+
+                // Cuando empieza a hablar, disparamos pico visual
+                if (!prevSpeaking && isSpeaking) {
+                    paranormalIntensity = 1;
+                    triggerPanelFlash();
+                }
             }
         };
 
         const waves = [
-            { id: 'c1', col: '#ff3333', step: 0.02, speed: 0.1 },
-            { id: 'c2', col: '#33ff33', step: 0.05, speed: 0.2 },
-            { id: 'c3', col: '#33aaff', step: 0.03, speed: 0.15 },
-            { id: 'c4', col: '#ffcc00', step: 0.06, speed: 0.25 }
+            { id: 'c1', col: '#ff3333', step: 0.02, speed: 0.12 },
+            { id: 'c2', col: '#33ff33', step: 0.05, speed: 0.20 },
+            { id: 'c3', col: '#33aaff', step: 0.03, speed: 0.16 },
+            { id: 'c4', col: '#ffcc00', step: 0.06, speed: 0.24 }
         ];
+
+        const containers = Array.from(document.querySelectorAll('.container'));
+
+        function triggerPanelFlash() {
+            containers.forEach(c => {
+                c.classList.add('paranormal-flash');
+                setTimeout(() => c.classList.remove('paranormal-flash'), 200);
+            });
+        }
 
         function render() {
             t += 0.15;
-            waves.forEach(w => {
+
+            // Normalizamos volumen a un rango útil (0–1.5 aprox)
+            const baseLevel = Math.min(vol / 80, 1.5);
+
+            waves.forEach((w, idx) => {
                 const canvas = document.getElementById(w.id);
                 if(!canvas) return;
                 const ctx = canvas.getContext('2d');
-                canvas.width = canvas.offsetWidth;
-                canvas.height = canvas.offsetHeight;
+
+                const wWidth = canvas.offsetWidth;
+                const wHeight = canvas.offsetHeight;
+                if (wWidth === 0 || wHeight === 0) return;
+
+                // Ajuste real de tamaño del canvas
+                if (canvas.width !== wWidth) canvas.width = wWidth;
+                if (canvas.height !== wHeight) canvas.height = wHeight;
 
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Fondo tenue tipo “scan”
+                const grad = ctx.createLinearGradient(0, 0, canvas.width, 0);
+                grad.addColorStop(0, 'rgba(0,0,0,0.75)');
+                grad.addColorStop(0.5, 'rgba(10,10,10,0.9)');
+                grad.addColorStop(1, 'rgba(0,0,0,0.75)');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
                 ctx.beginPath();
                 ctx.strokeStyle = w.col;
-                ctx.lineWidth = isSpeaking ? 3 : 2;
-                ctx.shadowBlur = isSpeaking ? 15 : vol / 4;
-                ctx.shadowColor = w.col;
 
-                for(let x=0; x<canvas.width; x++) {
-                    let agitation = isSpeaking ? (30 + Math.random()*20) : (vol * 0.7);
-                    let baseSine = Math.sin(x * w.step + t * w.speed) * (isSpeaking ? 15 : 5);
-                    let jitter = (Math.random() - 0.5) * agitation;
-                    
-                    let y = (canvas.height/2) + baseSine + jitter;
-                    let mask = Math.sin((x/canvas.width) * Math.PI);
-                    y = (canvas.height/2) + (y - canvas.height/2) * mask;
+                // Grosor y glow dependen de radio/paranormal
+                const lineBase = 1.5 + baseLevel * 1.5;
+                const lineBoost = isSpeaking ? 2.5 : 0;
+                ctx.lineWidth = lineBase + lineBoost;
 
-                    if(x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                const glowBase = 5 + baseLevel * 15;
+                const glowBoost = paranormalIntensity * 25;
+                ctx.shadowBlur = glowBase + glowBoost;
+                ctx.shadowColor = isSpeaking ? '#ff00ff' : w.col;
+
+                // Shake paranormal
+                const shakeAmp = isSpeaking ? 4 * (0.3 + paranormalIntensity) : 0;
+
+                for(let x = 0; x < canvas.width; x++) {
+                    const progress = x / canvas.width;
+
+                    // Amplitud base por sensor
+                    const sensorBase =
+                        idx === 0 ? 1.0 : // RF
+                        idx === 1 ? 0.9 : // Kinetic
+                        idx === 2 ? 0.8 : // Magnetic
+                                    0.7;  // Infrared
+
+                    // Amplitud ligada al volumen + pequeño ruido
+                    const amplitude =
+                        10 * sensorBase +
+                        baseLevel * 25 * sensorBase +
+                        (isSpeaking ? 10 * sensorBase : 0);
+
+                    const baseSine = Math.sin(x * w.step + t * w.speed) * amplitude;
+
+                    // Jitter radio/paranormal
+                    const jitterRadio = (Math.random() - 0.5) * baseLevel * 10;
+                    const jitterPara  = (Math.random() - 0.5) * paranormalIntensity * 35;
+                    let jitter = jitterRadio + jitterPara;
+
+                    // Más actividad hacia el centro
+                    const mask = Math.sin(progress * Math.PI);
+                    let y = (canvas.height / 2) + (baseSine + jitter) * mask;
+
+                    // Shake global
+                    const shakeX = (Math.random() - 0.5) * shakeAmp;
+                    const drawX = x + shakeX;
+
+                    if (x === 0) ctx.moveTo(drawX, y);
+                    else ctx.lineTo(drawX, y);
                 }
+
                 ctx.stroke();
+
+                // Scan-line tenue
+                ctx.shadowBlur = 0;
+                ctx.globalAlpha = 0.4;
+                ctx.fillStyle = 'rgba(255,255,255,0.08)';
+                const scanY = (t * 8 + idx * 30) % canvas.height;
+                ctx.fillRect(0, scanY, canvas.width, 2);
+                ctx.globalAlpha = 1;
             });
-            if(!isSpeaking) vol *= 0.85; 
+
+            // Decaimiento suave del pico paranormal
+            paranormalIntensity *= 0.90;
+            if (!isSpeaking) {
+                vol *= 0.90;
+            }
+
             requestAnimationFrame(render);
         }
+
         render();
     </script>
 </body>
