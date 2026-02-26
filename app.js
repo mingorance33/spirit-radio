@@ -43,9 +43,15 @@ function sendDataToVisualizer() {
     if (analyser) analyser.getByteFrequencyData(dataArray);
     if (visualWindow && !visualWindow.closed && running) {
         let total = 0;
-        for(let i = 0; i < dataArray.length; i++) total += dataArray[i];
-        let audioVolume = (total / dataArray.length) * 2;
-        visualWindow.postMessage({ type: 'AUDIO_UPDATE', volume: audioVolume, isSpeaking: isSpeaking }, '*');
+        for (let i = 0; i < dataArray.length; i++) total += dataArray[i];
+        // Volumen medio (0–255 aprox) sin multiplicar demasiado
+        let audioVolume = (total / dataArray.length);
+        audioVolume = Math.max(0, Math.min(audioVolume, 255));
+
+        visualWindow.postMessage(
+            { type: 'AUDIO_UPDATE', volume: audioVolume, isSpeaking: isSpeaking },
+            '*'
+        );
     }
 }
 
@@ -63,7 +69,10 @@ function playRandomRadioSlice() {
         radioTimerId = setTimeout(() => {
             radioBank.pause();
             if (running && !isSpeaking) {
-                radioTimerId = setTimeout(playRandomRadioSlice, Math.random() * 1000 + 200);
+                radioTimerId = setTimeout(
+                    playRandomRadioSlice,
+                    Math.random() * 1000 + 200
+                );
             }
         }, sliceDuration);
     }).catch(() => {
@@ -72,7 +81,9 @@ function playRandomRadioSlice() {
 }
 
 // --- LÓGICA DE VOZ (CON ANTI-BLOQUEO) ---
-fetch('phrases.json').then(res => res.json()).then(data => phrases = data.phrases);
+fetch('phrases.json')
+    .then(res => res.json())
+    .then(data => phrases = data.phrases);
 
 function triggerParanormalEvent() {
     if (!running || phrases.length === 0 || isSpeaking) return;
@@ -84,7 +95,7 @@ function triggerParanormalEvent() {
     msgEl.classList.add('evp-active');
     msgEl.textContent = "SINTONIZANDO...";
 
-    // Seguridad: Si en 3 segundos no ha hablado, forzar reset
+    // Seguridad: Si en 4 segundos no ha hablado, forzar reset
     const safetyTimeout = setTimeout(() => {
         if (msgEl.textContent === "SINTONIZANDO...") {
             console.log("Voz trabada, reseteando...");
@@ -104,6 +115,7 @@ function triggerParanormalEvent() {
 
         utter.onstart = () => {
             clearTimeout(safetyTimeout);
+            isSpeaking = true;                 // <- marca inicio real de voz
             msgEl.textContent = text.toUpperCase();
         };
         
@@ -140,14 +152,22 @@ function startRadio() {
         if (!isSpeaking && running) {
             const dialRect = dialEl.getBoundingClientRect();
             const wrapperRect = dialWrapper.getBoundingClientRect();
-            const percent = Math.max(0, Math.min(1, (dialRect.left - wrapperRect.left) / (wrapperRect.width - dialRect.width)));
-            msgEl.textContent = `${(153.000 + (percent * 128.000)).toFixed(3)} kHz`;
+            const percent = Math.max(
+                0,
+                Math.min(1, (dialRect.left - wrapperRect.left) /
+                    (wrapperRect.width - dialRect.width))
+            );
+            msgEl.textContent =
+                `${(153.000 + (percent * 128.000)).toFixed(3)} kHz`;
         }
         sendDataToVisualizer();
     }, 50);
     
     playRandomRadioSlice();
-    paranormalTimerId = setInterval(triggerParanormalEvent, 15000); // Cada 15 seg intenta hablar
+    paranormalTimerId = setInterval(
+        triggerParanormalEvent,
+        15000
+    ); // Cada 15 seg intenta hablar
 }
 
 function stopRadio() {
@@ -170,7 +190,11 @@ btnToggle.onclick = () => {
 };
 
 btnVisualizer.onclick = () => {
-    visualWindow = window.open('visualizer.html', 'SpiritVisualizer', 'width=500,height=600');
+    visualWindow = window.open(
+        'visualizer.html',
+        'SpiritVisualizer',
+        'width=500,height=600'
+    );
 };
 
 // Modal (Simplificado)
