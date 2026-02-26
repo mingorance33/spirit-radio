@@ -47,8 +47,8 @@
 <div class="panel" data-index="2"><span class="label">MAGNETIC FIELD</span></div>
 <div class="panel" data-index="3"><span class="label">INFRARED SENSOR</span></div>
 
-<!-- CDN PixiJS v8 -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/8.0.4/pixi.min.js" integrity="sha512-zG7dvpvT1Q5iGdrO0o2sl0+xY3sH9XbX3O1u/eRpb+0NeBPQ9wdW8tHztFHJNB8IPn3P4FKFeY+jA7fG0qTp7w==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<!-- PixiJS (v7 estable) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.2.4/pixi.min.js"></script>
 
 <script>
 let vol = 0;
@@ -58,13 +58,10 @@ let paranormalIntensity = 0;
 
 // Recibe datos desde app.js
 window.onmessage = (e) => {
-    if (e.data.type === 'AUDIO_UPDATE') {
+    if (e.data && e.data.type === 'AUDIO_UPDATE') {
         vol = e.data.volume || 0;
         const prev = isSpeaking;
         isSpeaking = !!e.data.isSpeaking;
-
-        // Debug opcional:
-        // console.log('AUDIO_UPDATE', vol, isSpeaking);
 
         if (!prev && isSpeaking) {
             paranormalIntensity = 1;   // pico al inicio de cada voz
@@ -78,14 +75,21 @@ const colors = [0xFF3333, 0x33FF33, 0x33AAFF, 0xFFCC00];
 const apps = [];
 const waves = [];
 
+// Crear una app Pixi por panel
 panels.forEach((panel, idx) => {
     const app = new PIXI.Application({
-        resizeTo: panel,
+        width: panel.clientWidth,
+        height: panel.clientHeight,
         backgroundAlpha: 0,
         antialias: true
     });
     panel.appendChild(app.view);
     apps.push(app);
+
+    // Redimensionar al cambiar la ventana
+    window.addEventListener('resize', () => {
+        app.renderer.resize(panel.clientWidth, panel.clientHeight);
+    });
 
     const wave = new PIXI.Graphics();
     const glow = new PIXI.filters.BlurFilter(0, 1);
@@ -104,5 +108,97 @@ panels.forEach((panel, idx) => {
     });
 });
 
+// Función de dibujo de una onda
 function drawWave(w) {
     const app = w.app;
+    const gfx = w.gfx;
+
+    const width  = app.renderer.width;
+    const height = app.renderer.height;
+    if (!width || !height) return;
+
+    // Volumen medio normalizado (más sensible)
+    const baseLevel = Math.min(Math.max(vol, 5) / 30, 2.0);
+
+    const amplitude =
+        10 * w.baseAmp +
+        baseLevel * 25 * w.baseAmp +      // radio
+        (isSpeaking ? 25 * w.baseAmp : 0); // voz paranormal extra
+
+    const glowBase  = 5 + baseLevel * 10;     // radio
+    const glowBoost = paranormalIntensity * 35; // pico paranormal
+    w.glow.blur = glowBase + glowBoost;
+
+    const lineBase  = 1.5 + baseLevel * 1.2;
+    const lineBoost = isSpeaking ? 3.5 : 0;
+    const lineWidth = lineBase + lineBoost;
+
+    const shakeAmp = isSpeaking ? 6 * (0.3 + paranormalIntensity) : 0;
+
+    gfx.clear();
+
+    const col = isSpeaking
+        ? PIXI.utils.mixColors(w.color, 0xFF00FF, 0.6) // magenta al hablar
+        : w.color;
+
+    gfx.lineStyle(lineWidth, col, 1);
+
+    const points = [];
+    for (let x = 0; x < width; x++) {
+        const progress = x / width;
+        const baseSine = Math.sin(x * w.step + t * w.speed) * amplitude;
+
+        const jitterRadio = (Math.random() - 0.5) * baseLevel * 10;
+        const jitterPara  = (Math.random() - 0.5) * paranormalIntensity * 35;
+        const jitter = jitterRadio + jitterPara;
+
+        const mask = Math.sin(progress * Math.PI);
+        let y = (height / 2) + (baseSine + jitter) * mask;
+
+        const shakeX = (Math.random() - 0.5) * shakeAmp;
+        const drawX  = x + shakeX;
+
+        points.push(drawX, y);
+    }
+
+    if (points.length >= 4) {
+        gfx.moveTo(points[0], points[1]);
+        for (let i = 2; i < points.length; i += 2) {
+            gfx.lineTo(points[i], points[i + 1]);
+        }
+    }
+
+    // Scan-line tenue
+    gfx.lineStyle(0);
+    gfx.beginFill(0xFFFFFF, 0.08);
+    const scanY = (t * 8 + (app.__scanOffset || 0)) % height;
+    gfx.drawRect(0, scanY, width, 2);
+    gfx.endFill();
+}
+
+// Offset distinto para cada panel
+apps.forEach((app, idx) => {
+    app.__scanOffset = idx * 30;
+});
+
+// TEST: si no llegan datos aún, simular volumen para que veas algo
+setInterval(() => {
+    if (vol === 0 && !isSpeaking) {
+        vol = 80; // valor medio para tener ondas visibles
+    }
+}, 500);
+
+// Bucle principal (usa el ticker del primer app)
+apps[0].ticker.add((delta) => {
+    t += 0.15 * delta;
+
+    waves.forEach(drawWave);
+
+    paranormalIntensity *= 0.90;  // decaimiento del pico paranormal
+    if (!isSpeaking) {
+        vol *= 0.95;              // decaimiento suave de radio
+    }
+});
+</script>
+</body>
+</html>
