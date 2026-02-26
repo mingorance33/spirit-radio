@@ -4,24 +4,17 @@
     <meta charset="UTF-8">
     <title>Ultra Visualizer - Spirit Radio</title>
     <style>
-        body { 
-            margin: 0; 
-            background: #000; 
-            overflow: hidden; 
-            font-family: 'Courier New', monospace; 
-        }
+        body { margin: 0; background: #000; overflow: hidden; font-family: 'Courier New', monospace; }
         #container { width: 100vw; height: 100vh; }
         .ui-overlay {
             position: absolute; top: 15px; left: 15px; color: #0ff;
             pointer-events: none; text-transform: uppercase; letter-spacing: 2px;
-            font-size: 12px; text-shadow: 0 0 8px #0ff;
-            z-index: 10;
+            font-size: 12px; text-shadow: 0 0 8px #0ff; z-index: 10;
         }
         #btnClose {
             position: fixed; top: 10px; right: 10px; background: rgba(0,0,0,0.5);
             color: #ff3333; border: 1px solid #ff3333; cursor: pointer;
-            padding: 8px 12px; z-index: 100; border-radius: 4px;
-            font-weight: bold;
+            padding: 8px 12px; z-index: 100; border-radius: 4px; font-weight: bold;
         }
     </style>
 </head>
@@ -49,18 +42,14 @@
         let waves = [];
         let vol = 0, isSpeaking = false;
         
-        // Colores originales basados en tus sensores
         const defaultColors = [0xff3333, 0x33ff33, 0x33aaff, 0xffcc00];
 
-        // --- CONEXIÓN CON APP.JS ---
         window.onmessage = (e) => {
             if(e.data.type === 'AUDIO_UPDATE') {
                 vol = e.data.volume || 0;
                 isSpeaking = e.data.isSpeaking;
-                
-                const statusEl = document.getElementById('status');
-                statusEl.innerText = isSpeaking ? "ENTIDAD DETECTADA" : "BARRIDO RF";
-                statusEl.style.color = isSpeaking ? "#ff00ff" : "#0ff";
+                document.getElementById('status').innerText = isSpeaking ? "ENTIDAD DETECTADA" : "BARRIDO RF";
+                document.getElementById('status').style.color = isSpeaking ? "#ff00ff" : "#0ff";
             }
         };
 
@@ -74,37 +63,28 @@
             renderer.setPixelRatio(window.devicePixelRatio);
             document.getElementById('container').appendChild(renderer.domElement);
 
-            // --- POST-PROCESADO (PARA EL BRILLO NEÓN) ---
             const renderScene = new RenderPass(scene, camera);
-            const bloomPass = new UnrealBloomPass(
-                new THREE.Vector2(window.innerWidth, window.innerHeight),
-                2.0,  // Fuerza del brillo
-                0.5,  // Radio
-                0.1   // Umbral
-            );
-            
+            const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 2.0, 0.5, 0.1);
             composer = new EffectComposer(renderer);
             composer.addPass(renderScene);
             composer.addPass(bloomPass);
 
-            // Crear las 4 ondas
             for (let i = 0; i < 4; i++) {
                 const geometry = new THREE.BufferGeometry();
                 const points = [];
-                // Creamos una línea con 200 segmentos para suavidad
-                for (let x = -6; x < 6; x += 0.05) {
-                    points.push(new THREE.Vector3(x, 0, 0));
-                }
+                for (let x = -6; x < 6; x += 0.05) points.push(new THREE.Vector3(x, 0, 0));
                 geometry.setFromPoints(points);
                 
-                const material = new THREE.LineBasicMaterial({ 
-                    color: defaultColors[i], 
-                    transparent: true,
-                    opacity: 0.8
-                });
-                
+                const material = new THREE.LineBasicMaterial({ color: defaultColors[i], transparent: true, opacity: 0.8 });
                 const line = new THREE.Line(geometry, material);
-                line.position.y = 1.8 - (i * 1.2); // Posicionamiento vertical
+                line.position.y = 1.8 - (i * 1.2);
+                
+                // --- NUEVO: Propiedad personalizada para la variación aleatoria ---
+                line.userData = { 
+                    noiseOffset: Math.random() * 100, // Punto de inicio en el ruido
+                    currentAmp: 0.1 
+                };
+                
                 scene.add(line);
                 waves.push(line);
             }
@@ -117,34 +97,29 @@
             waves.forEach((line, i) => {
                 const positions = line.geometry.attributes.position.array;
                 
-                // --- GESTIÓN DE COLOR CORREGIDA ---
-                // Si habla, el color objetivo es blanco; si no, su color original
+                // 1. Variación aleatoria suave de la amplitud base (independiente para cada onda)
+                line.userData.noiseOffset += 0.01;
+                // Usamos Math.sin para que el cambio de amplitud no sea brusco
+                const randomVariation = Math.abs(Math.sin(line.userData.noiseOffset)) * 0.3;
+                
                 const targetColor = new THREE.Color(isSpeaking ? 0xffffff : defaultColors[i]);
-                line.material.color.lerp(targetColor, 0.08); // Suaviza la vuelta al color
+                line.material.color.lerp(targetColor, 0.08);
 
-                // --- GESTIÓN DE MOVIMIENTO ---
                 for (let j = 0; j < positions.length; j += 3) {
                     const x = positions[j];
                     
-                    // Frecuencia y amplitud base
+                    // 2. Aplicamos la variación aleatoria a la amplitud
                     let freq = (2 + i) * 0.8;
-                    let amp = (vol * 0.06) + 0.1;
+                    let amp = (vol * 0.06) + 0.05 + randomVariation; 
                     
-                    // Modificadores si hay "voz" paranormal
                     if (isSpeaking) {
                         freq *= 2.5;
-                        amp += 0.5;
-                        // Añadimos ruido (jitter) aleatorio
-                        positions[j + 1] += (Math.random() - 0.5) * 0.1;
+                        amp += 0.6;
+                        positions[j + 1] += (Math.random() - 0.5) * 0.15; // Jitter paranormal
                     }
 
-                    // Máscara para que los bordes de la línea no se corten bruscamente
                     const edgeMask = Math.cos(x / 4.0);
-                    
-                    // Ecuación de la onda
                     const y = Math.sin(x * freq + time + i) * amp * edgeMask;
-                    
-                    // Aplicar posición y (suavizada ligeramente)
                     positions[j + 1] = THREE.MathUtils.lerp(positions[j + 1], y, 0.2);
                 }
                 
@@ -154,7 +129,6 @@
             composer.render();
         }
 
-        // Ajuste de pantalla al redimensionar
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
