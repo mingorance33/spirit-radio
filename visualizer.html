@@ -12,7 +12,6 @@
         }
         #container { width: 100vw; height: 100vh; }
         
-        /* BOTÓN CERRAR: Ubicado con margen de seguridad */
         #btnClose {
             position: fixed; 
             top: calc(20px + env(safe-area-inset-top)); 
@@ -22,10 +21,8 @@
             width: 65px; height: 65px; z-index: 9999;
             border-radius: 50%; font-weight: bold; font-size: 28px;
             display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 0 15px rgba(255, 0, 0, 0.3);
         }
 
-        /* ESTADO: Debajo de la barra de estado del móvil */
         .ui-overlay {
             position: absolute; 
             top: calc(25px + env(safe-area-inset-top)); 
@@ -35,25 +32,24 @@
             font-size: 20px; text-shadow: 0 0 10px #0ff; z-index: 10;
         }
 
-        /* PANELES DE DATOS: Flotando a los lados, no abajo para no tapar nada */
         .data-panel {
-            position: absolute; color: rgba(0, 255, 255, 0.4);
+            position: absolute; color: rgba(0, 255, 255, 0.5);
             font-size: 11px; pointer-events: none; z-index: 5;
             line-height: 1.4;
+            min-width: 120px;
         }
         .mid-left { top: 40%; left: 15px; }
         .mid-right { top: 40%; right: 15px; text-align: right; }
         
-        .highlight { color: #ff3333; font-weight: bold; }
+        .highlight { color: #ff3333; font-weight: bold; text-shadow: 0 0 5px #ff0000; }
     </style>
 </head>
 <body>
     <button id="btnClose" onclick="window.close()">X</button>
-
     <div class="ui-overlay">DETECTOR: <span id="status">BARRIDO RF</span></div>
     
-    <div class="data-panel mid-left" id="panel1"></div>
-    <div class="data-panel mid-right" id="panel2"></div>
+    <div class="data-panel mid-left" id="panel1">Iniciando...</div>
+    <div class="data-panel mid-right" id="panel2">Esperando...</div>
 
     <div id="container"></div>
 
@@ -77,15 +73,20 @@
         let vol = 0, isSpeaking = false, isPaused = true;
         const colors = [0xff4444, 0x44ff44, 0x4488ff, 0xffcc00];
 
-        function genData() { return (Math.random() * 100).toFixed(6); }
+        function genData() { return (Math.random() * 100).toFixed(8); }
 
-        function updateDataPanels() {
-            if (isPaused) return;
-            const p1 = document.getElementById('panel1');
-            const p2 = document.getElementById('panel2');
-            const noise = isSpeaking ? "<span class='highlight'>ANOMALÍA</span><br>" : "SENS: " + genData() + "<br>";
-            p1.innerHTML = noise + "EM_F: " + genData() + "<br>VOLT: " + (vol/100).toFixed(4);
-            p2.innerHTML = "GAIN: " + (vol).toFixed(2) + "db<br>LNCY: " + (Math.random()*0.1).toFixed(4);
+        // BUCLE DE DATOS INDEPENDIENTE (Cambio continuo)
+        function loopData() {
+            if (!isPaused) {
+                const p1 = document.getElementById('panel1');
+                const p2 = document.getElementById('panel2');
+                
+                const noisePrefix = isSpeaking ? "<span class='highlight'>ANOMALÍA</span><br>" : "SENS: " + genData().substring(0,8) + "<br>";
+                
+                p1.innerHTML = noisePrefix + "EM_F: " + genData() + "<br>VOLT: " + (vol/100 + Math.random()*0.01).toFixed(6);
+                p2.innerHTML = "GAIN: " + (vol + Math.random()).toFixed(2) + "db<br>LNCY: " + (Math.random()*0.01).toFixed(6) + "<br>SYNC: " + Date.now().toString().slice(-6);
+            }
+            setTimeout(loopData, 100); // Se actualiza cada 100ms (10 veces por segundo)
         }
 
         window.onmessage = (e) => {
@@ -96,7 +97,6 @@
                 const statusEl = document.getElementById('status');
                 statusEl.innerText = isSpeaking ? "¡ENTIDAD!" : "BARRIDO";
                 statusEl.style.color = isSpeaking ? "#ff0000" : "#0ff";
-                if(Math.random() > 0.8) updateDataPanels();
             }
             if(e.data.type === 'STOP_ALL') {
                 isPaused = true;
@@ -141,6 +141,8 @@
                 scene.add(s);
                 sparks.push({ mesh: s, life: 0 });
             }
+            
+            loopData(); // Iniciar el bucle de números
         }
 
         function triggerSpark(x, y, isPara) {
