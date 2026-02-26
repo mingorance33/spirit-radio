@@ -24,6 +24,7 @@ let isSpeaking = false;
 // --- MOTOR DE AUDIO ---
 let audioCtx, analyser, dataArray;
 let visualWindow = null;
+let sourceStatic, sourceRadio;
 
 function initAudioAnalysis() {
     if (!audioCtx) {
@@ -33,14 +34,13 @@ function initAudioAnalysis() {
         analyser.fftSize = 256;
         dataArray = new Uint8Array(analyser.frequencyBinCount);
 
-        const sourceStatic = audioCtx.createMediaElementSource(staticNoise);
-        const sourceRadio  = audioCtx.createMediaElementSource(radioBank);
+        // IMPORTANTE: crear estas fuentes SOLO una vez
+        sourceStatic = audioCtx.createMediaElementSource(staticNoise);
+        sourceRadio  = audioCtx.createMediaElementSource(radioBank);
 
-        // Mezclamos ambos hacia el analizador y hacia la salida
-        const mixNode = audioCtx.createGain();
-        sourceStatic.connect(mixNode);
-        sourceRadio.connect(mixNode);
-        mixNode.connect(analyser);
+        // Ambas fuentes al analyser y de ahí a la salida
+        sourceStatic.connect(analyser);
+        sourceRadio.connect(analyser);
         analyser.connect(audioCtx.destination);
     }
 }
@@ -125,7 +125,7 @@ function triggerParanormalEvent() {
 
         utter.onstart = () => {
             clearTimeout(safetyTimeout);
-            isSpeaking = true; // marca inicio real de la voz
+            isSpeaking = true;
             msgEl.textContent = text.toUpperCase();
         };
 
@@ -146,7 +146,7 @@ function resetAfterVoice() {
 function startRadio() {
     initAudioAnalysis();
 
-    // En móvil, asegura que el contexto se activa tras la interacción
+    // En móvil: asegura que el contexto está activo tras pulsar el botón
     if (audioCtx.state === "suspended") {
         audioCtx.resume();
     }
