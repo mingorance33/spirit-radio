@@ -8,64 +8,52 @@
         body { 
             margin: 0; background: #000; overflow: hidden; 
             font-family: 'Courier New', monospace;
-            /* Evita que el usuario haga zoom o scroll accidental */
             touch-action: none; 
         }
         #container { width: 100vw; height: 100vh; }
         
-        /* CONTENEDOR DE BOTONES SUPERIORES */
-        .top-controls {
-            position: fixed;
-            /* env-safe-area es la clave para que el notch no lo tape */
+        /* BOTÓN CERRAR: Ubicado con margen de seguridad */
+        #btnClose {
+            position: fixed; 
             top: calc(20px + env(safe-area-inset-top)); 
             right: 20px;
-            display: flex;
-            gap: 15px;
-            z-index: 9999;
-        }
-
-        .btn-ui {
-            background: rgba(0, 255, 255, 0.1); color: #0ff; 
-            border: 2px solid #0ff; cursor: pointer;
-            width: 60px; height: 60px;
-            border-radius: 12px; font-weight: bold; font-size: 24px;
+            background: rgba(255, 0, 0, 0.1); color: #ff3333; 
+            border: 2px solid #ff3333; cursor: pointer;
+            width: 65px; height: 65px; z-index: 9999;
+            border-radius: 50%; font-weight: bold; font-size: 28px;
             display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
+            box-shadow: 0 0 15px rgba(255, 0, 0, 0.3);
         }
-        
-        #btnClose { border-color: #ff3333; color: #ff3333; }
 
-        /* TEXTO DE ESTADO CON MARGEN DE SEGURIDAD */
+        /* ESTADO: Debajo de la barra de estado del móvil */
         .ui-overlay {
             position: absolute; 
-            top: calc(30px + env(safe-area-inset-top)); 
-            left: 25px; 
+            top: calc(25px + env(safe-area-inset-top)); 
+            left: 20px; 
             color: #0ff;
-            pointer-events: none; text-transform: uppercase; letter-spacing: 2px;
-            font-size: 18px; text-shadow: 0 0 10px #0ff; z-index: 10;
+            pointer-events: none; text-transform: uppercase;
+            font-size: 20px; text-shadow: 0 0 10px #0ff; z-index: 10;
         }
 
+        /* PANELES DE DATOS: Flotando a los lados, no abajo para no tapar nada */
         .data-panel {
             position: absolute; color: rgba(0, 255, 255, 0.4);
             font-size: 11px; pointer-events: none; z-index: 5;
-            line-height: 1.2;
+            line-height: 1.4;
         }
-        .bottom-left { bottom: calc(20px + env(safe-area-inset-bottom)); left: 20px; }
-        .bottom-right { bottom: calc(20px + env(safe-area-inset-bottom)); right: 20px; text-align: right; }
+        .mid-left { top: 40%; left: 15px; }
+        .mid-right { top: 40%; right: 15px; text-align: right; }
         
         .highlight { color: #ff3333; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div class="top-controls">
-        <button id="btnFS" class="btn-ui">⛶</button>
-        <button id="btnClose" class="btn-ui">X</button>
-    </div>
+    <button id="btnClose" onclick="window.close()">X</button>
 
     <div class="ui-overlay">DETECTOR: <span id="status">BARRIDO RF</span></div>
     
-    <div class="data-panel bottom-left" id="panel1"></div>
-    <div class="data-panel bottom-right" id="panel2"></div>
+    <div class="data-panel mid-left" id="panel1"></div>
+    <div class="data-panel mid-right" id="panel2"></div>
 
     <div id="container"></div>
 
@@ -89,24 +77,6 @@
         let vol = 0, isSpeaking = false, isPaused = true;
         const colors = [0xff4444, 0x44ff44, 0x4488ff, 0xffcc00];
 
-        // LÓGICA FULLSCREEN
-        const btnFS = document.getElementById('btnFS');
-        btnFS.onclick = () => {
-            if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen().catch(err => {
-                    alert(`Error al intentar pantalla completa: ${err.message}`);
-                });
-                btnFS.innerText = "◂▸";
-            } else {
-                document.exitFullscreen();
-                btnFS.innerText = "⛶";
-            }
-        };
-
-        const btnClose = document.getElementById('btnClose');
-        btnClose.onclick = () => window.close();
-
-        // NÚMEROS ALEATORIOS
         function genData() { return (Math.random() * 100).toFixed(6); }
 
         function updateDataPanels() {
@@ -126,9 +96,13 @@
                 const statusEl = document.getElementById('status');
                 statusEl.innerText = isSpeaking ? "¡ENTIDAD!" : "BARRIDO";
                 statusEl.style.color = isSpeaking ? "#ff0000" : "#0ff";
-                updateDataPanels();
+                if(Math.random() > 0.8) updateDataPanels();
             }
-            if(e.data.type === 'STOP_ALL') isPaused = true;
+            if(e.data.type === 'STOP_ALL') {
+                isPaused = true;
+                document.getElementById('status').innerText = "OFFLINE";
+                document.getElementById('status').style.color = "#444";
+            }
         };
 
         function init() {
@@ -137,12 +111,12 @@
             camera.position.z = 5;
 
             renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.getElementById('container').appendChild(renderer.domElement);
 
             const renderPass = new RenderPass(scene, camera);
-            const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 2.0, 0.4, 0.1);
+            const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 2.2, 0.4, 0.1);
             composer = new EffectComposer(renderer);
             composer.addPass(renderPass);
             composer.addPass(bloomPass);
@@ -152,7 +126,7 @@
                 const points = [];
                 for (let x = -8; x < 8; x += 0.2) points.push(new THREE.Vector3(x, 0, 0));
                 geometry.setFromPoints(points);
-                const material = new THREE.LineBasicMaterial({ color: colors[i], transparent: true, opacity: 0.6 });
+                const material = new THREE.LineBasicMaterial({ color: colors[i], transparent: true, opacity: 0.7 });
                 const line = new THREE.Line(geometry, material);
                 line.userData = { fStep: Math.random()*50, aStep: Math.random()*50, speed: 0.003 + (i*0.001) };
                 scene.add(line);
@@ -176,7 +150,7 @@
                 s.mesh.visible = true;
                 s.life = 1.0;
                 s.mesh.material.color.set(isPara ? 0xff0000 : 0xffffff);
-                const size = isPara ? 4.0 : 0.8;
+                const size = isPara ? 4.5 : 0.8;
                 s.mesh.scale.set(size, size, size);
             }
         }
@@ -222,7 +196,6 @@
             });
 
             composer.render();
-            if(Math.random() > 0.8) updateDataPanels();
         }
 
         window.addEventListener('resize', () => {
