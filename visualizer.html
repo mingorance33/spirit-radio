@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Ultra Visualizer - Spirit Radio</title>
+    <title>Spirit Radio - Espectro Dinámico</title>
     <style>
         body { margin: 0; background: #000; overflow: hidden; font-family: 'Courier New', monospace; }
         #container { width: 100vw; height: 100vh; }
@@ -20,7 +20,7 @@
 </head>
 <body>
     <button id="btnClose" onclick="window.close()">X</button>
-    <div class="ui-overlay">ESTADO: <span id="status">ESCANEANDO ESPECTRO</span></div>
+    <div class="ui-overlay">BARRIDO: <span id="status">ACTIVO</span></div>
     <div id="container"></div>
 
     <script type="importmap">
@@ -48,8 +48,7 @@
             if(e.data.type === 'AUDIO_UPDATE') {
                 vol = e.data.volume || 0;
                 isSpeaking = e.data.isSpeaking;
-                document.getElementById('status').innerText = isSpeaking ? "ENTIDAD DETECTADA" : "BARRIDO RF";
-                document.getElementById('status').style.color = isSpeaking ? "#ff00ff" : "#0ff";
+                document.getElementById('status').innerText = isSpeaking ? "VOZ DETECTADA" : "BARRIDO RF";
             }
         };
 
@@ -64,7 +63,7 @@
             document.getElementById('container').appendChild(renderer.domElement);
 
             const renderScene = new RenderPass(scene, camera);
-            const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 2.0, 0.5, 0.1);
+            const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 2.2, 0.4, 0.1);
             composer = new EffectComposer(renderer);
             composer.addPass(renderScene);
             composer.addPass(bloomPass);
@@ -79,10 +78,11 @@
                 const line = new THREE.Line(geometry, material);
                 line.position.y = 1.8 - (i * 1.2);
                 
-                // --- NUEVO: Propiedad personalizada para la variación aleatoria ---
+                // Propiedades para aleatoriedad independiente
                 line.userData = { 
-                    noiseOffset: Math.random() * 100, // Punto de inicio en el ruido
-                    currentAmp: 0.1 
+                    ampStep: Math.random() * 100,
+                    freqStep: Math.random() * 100, // Offset para la longitud de onda
+                    baseFreq: 1.5 + i * 0.5
                 };
                 
                 scene.add(line);
@@ -92,35 +92,42 @@
 
         function animate() {
             requestAnimationFrame(animate);
-            const time = Date.now() * 0.004;
+            const time = Date.now() * 0.003;
 
             waves.forEach((line, i) => {
                 const positions = line.geometry.attributes.position.array;
                 
-                // 1. Variación aleatoria suave de la amplitud base (independiente para cada onda)
-                line.userData.noiseOffset += 0.01;
-                // Usamos Math.sin para que el cambio de amplitud no sea brusco
-                const randomVariation = Math.abs(Math.sin(line.userData.noiseOffset)) * 0.3;
+                // Actualizamos pasos de aleatoriedad
+                line.userData.ampStep += 0.015;
+                line.userData.freqStep += 0.01;
+
+                // Variación de Longitud de Onda (Frecuencia)
+                // Esto hace que la onda se estire y encoja aleatoriamente
+                const freqVariation = line.userData.baseFreq + Math.sin(line.userData.freqStep) * 1.2;
                 
+                // Variación de Amplitud
+                const ampVariation = (vol * 0.05) + Math.abs(Math.cos(line.userData.ampStep)) * 0.25;
+
                 const targetColor = new THREE.Color(isSpeaking ? 0xffffff : defaultColors[i]);
-                line.material.color.lerp(targetColor, 0.08);
+                line.material.color.lerp(targetColor, 0.1);
 
                 for (let j = 0; j < positions.length; j += 3) {
                     const x = positions[j];
                     
-                    // 2. Aplicamos la variación aleatoria a la amplitud
-                    let freq = (2 + i) * 0.8;
-                    let amp = (vol * 0.06) + 0.05 + randomVariation; 
-                    
+                    let currentFreq = freqVariation;
+                    let currentAmp = ampVariation;
+
                     if (isSpeaking) {
-                        freq *= 2.5;
-                        amp += 0.6;
-                        positions[j + 1] += (Math.random() - 0.5) * 0.15; // Jitter paranormal
+                        currentFreq *= 2.0; // Se acelera al detectar voz
+                        currentAmp += 0.4;
+                        positions[j + 1] += (Math.random() - 0.5) * 0.1; // Ruido
                     }
 
                     const edgeMask = Math.cos(x / 4.0);
-                    const y = Math.sin(x * freq + time + i) * amp * edgeMask;
-                    positions[j + 1] = THREE.MathUtils.lerp(positions[j + 1], y, 0.2);
+                    const y = Math.sin(x * currentFreq + time) * currentAmp * edgeMask;
+                    
+                    // Suavizado de movimiento (lerp de posición)
+                    positions[j + 1] = THREE.MathUtils.lerp(positions[j + 1], y, 0.15);
                 }
                 
                 line.geometry.attributes.position.needsUpdate = true;
