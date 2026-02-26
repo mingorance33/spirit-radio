@@ -2,19 +2,19 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Espectro Spirit Radio - Pro</title>
+    <title>Spirit Radio - Detección de Coincidencias</title>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; }
-        #container { width: 100vw; height: 100vh; cursor: none; }
-        .ui {
-            position: absolute; top: 10px; left: 10px; color: #0ff;
-            font-family: monospace; font-size: 10px; letter-spacing: 1px;
-            text-shadow: 0 0 5px #0ff; pointer-events: none;
+        body { margin: 0; background: #000; overflow: hidden; font-family: 'Courier New', monospace; }
+        #container { width: 100vw; height: 100vh; }
+        .ui-overlay {
+            position: absolute; top: 15px; left: 15px; color: #0ff;
+            pointer-events: none; text-transform: uppercase; letter-spacing: 2px;
+            font-size: 11px; text-shadow: 0 0 8px #0ff; z-index: 10;
         }
     </style>
 </head>
 <body>
-    <div class="ui">SISTEMA DE ANÁLISIS ESPECTRAL V1.0</div>
+    <div class="ui-overlay">MODO: <span id="status">ANÁLISIS DE COINCIDENCIAS</span></div>
     <div id="container"></div>
 
     <script type="importmap">
@@ -33,6 +33,7 @@
         import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
         let scene, camera, renderer, composer, waves = [];
+        let sparks = []; // Array para los destellos
         let vol = 0, isSpeaking = false;
         const colors = [0xff4444, 0x44ff44, 0x4488ff, 0xffcc00];
 
@@ -46,89 +47,92 @@
         function init() {
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.z = 4;
+            camera.position.z = 5;
 
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.getElementById('container').appendChild(renderer.domElement);
 
             const renderPass = new RenderPass(scene, camera);
-            const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 3.0, 0.5, 0.15);
+            // Subimos el Bloom para que los destellos "exploten" en brillo
+            const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 2.8, 0.4, 0.1);
             composer = new EffectComposer(renderer);
             composer.addPass(renderPass);
             composer.addPass(bloomPass);
 
+            // Crear Ondas
             for (let i = 0; i < 4; i++) {
                 const geometry = new THREE.BufferGeometry();
                 const points = [];
-                for (let x = -8; x < 8; x += 0.05) points.push(new THREE.Vector3(x, 0, 0));
+                for (let x = -7; x < 7; x += 0.1) points.push(new THREE.Vector3(x, 0, 0));
                 geometry.setFromPoints(points);
-                
                 const material = new THREE.LineBasicMaterial({ color: colors[i], transparent: true, opacity: 0.8 });
                 const line = new THREE.Line(geometry, material);
-                line.position.y = 1.8 - (i * 1.2);
-                
-                // Configuración para el efecto del vídeo:
-                line.userData = { 
-                    f: Math.random() * 10,  // fase inicial
-                    fV: 0.02 + Math.random() * 0.05, // velocidad de cambio de frecuencia
-                    aV: 0.01 + Math.random() * 0.03  // velocidad de cambio de amplitud
-                };
-                
+                // En esta versión las ponemos más juntas para facilitar coincidencias
+                line.position.y = 1.5 - (i * 1.0);
+                line.userData = { fStep: Math.random() * 10, speed: 0.003 + (Math.random() * 0.004) };
                 scene.add(line);
                 waves.push(line);
+            }
+
+            // Crear un prototipo de destello (pequeña esfera brillante)
+            const sparkGeo = new THREE.SphereGeometry(0.05, 8, 8);
+            const sparkMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            for(let i=0; i<10; i++) {
+                const s = new THREE.Mesh(sparkGeo, sparkMat);
+                s.visible = false;
+                scene.add(s);
+                sparks.push({ mesh: s, life: 0 });
+            }
+        }
+
+        function createSpark(x, y) {
+            let s = sparks.find(sp => !sp.mesh.visible);
+            if (s) {
+                s.mesh.position.set(x, y, 0);
+                s.mesh.visible = true;
+                s.life = 1.0;
+                s.mesh.scale.set(1, 1, 1);
             }
         }
 
         function animate() {
             requestAnimationFrame(animate);
-            const t = Date.now() * 0.001;
+            const t = Date.now();
 
+            // Actualizar Ondas
             waves.forEach((line, i) => {
                 const pos = line.geometry.attributes.position.array;
-                const ud = line.userData;
-
-                // Variación de color dinámica (Flash blanco)
-                const targetColor = new THREE.Color(isSpeaking ? 0xffffff : colors[i]);
-                line.material.color.lerp(targetColor, 0.15);
-
-                // --- LÓGICA DE INESTABILIDAD TIPO VÍDEO ---
-                // La frecuencia cambia sola usando una función de seno desfasada
-                const currentFreq = (2 + i) + Math.sin(t * 2 + i) * 1.5;
-                // La amplitud base tiene un "temblor" constante
-                const currentAmp = (vol * 0.1) + 0.15 + (Math.sin(t * 3 + i) * 0.2);
+                line.userData.fStep += 0.01;
+                const freq = (2 + i) + Math.sin(line.userData.fStep) * 1.5;
+                const amp = (vol * 0.1) + 0.2 + (Math.sin(t * 0.002 + i) * 0.2);
 
                 for (let j = 0; j < pos.length; j += 3) {
                     const x = pos[j];
-                    
-                    // Modificador de longitud de onda por punto (crea el efecto de "serpiente")
-                    const waveX = x * currentFreq + (t * (3 + i));
-                    
-                    // Mezclamos dos senos para romper la simetría perfecta
-                    let y = Math.sin(waveX) * currentAmp;
-                    y += Math.sin(waveX * 0.5) * (currentAmp * 0.3); 
+                    const mask = Math.cos(x / 5);
+                    const y = Math.sin(x * freq + (t * line.userData.speed)) * amp * mask;
+                    pos[j + 1] = THREE.MathUtils.lerp(pos[j + 1], y, 0.2);
 
-                    if (isSpeaking) {
-                        // Distorsión agresiva si hay voz
-                        y += (Math.random() - 0.5) * 0.4; 
+                    // DETECCIÓN DE COINCIDENCIA:
+                    // Si el punto está cruzando el eje X (punto cero) y la amplitud es alta
+                    if (Math.abs(pos[j+1]) < 0.01 && Math.random() > 0.995) {
+                        createSpark(x, line.position.y);
                     }
-
-                    // Atenuación en los bordes
-                    const mask = Math.cos(x / 5.5);
-                    pos[j + 1] = THREE.MathUtils.lerp(pos[j + 1], y * mask, 0.3);
                 }
                 line.geometry.attributes.position.needsUpdate = true;
             });
 
+            // Animar Destellos (desvanecimiento)
+            sparks.forEach(s => {
+                if (s.mesh.visible) {
+                    s.life -= 0.05;
+                    s.mesh.scale.multiplyScalar(0.9);
+                    if (s.life <= 0) s.mesh.visible = false;
+                }
+            });
+
             composer.render();
         }
-
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            composer.setSize(window.innerWidth, window.innerHeight);
-        });
 
         init();
         animate();
