@@ -118,7 +118,13 @@ function drawWave(w) {
     if (!width || !height) return;
 
     // Volumen medio normalizado (más sensible)
-    const baseLevel = Math.min(Math.max(vol, 5) / 30, 2.0);
+    // Si está hablando, forzamos un volumen alto para que la animación no muera
+let effectiveVol = vol;
+if (isSpeaking && effectiveVol < 80) {
+    effectiveVol = 80;
+}
+const baseLevel = Math.min(Math.max(effectiveVol, 5) / 30, 2.0);
+
 
     const amplitude =
         10 * w.baseAmp +
@@ -194,10 +200,13 @@ apps[0].ticker.add((delta) => {
 
     waves.forEach(drawWave);
 
-    paranormalIntensity *= 0.90;  // decaimiento del pico paranormal
-    if (!isSpeaking) {
-        vol *= 0.95;              // decaimiento suave de radio
-    }
+   paranormalIntensity *= 0.90;
+// Solo dejamos caer el volumen cuando NO habla;
+// mientras habla, mantenemos el nivel para no “congelar” la onda
+if (!isSpeaking) {
+    vol *= 0.95;
+}
+
 });
 </script>
 </body>
