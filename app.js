@@ -2,10 +2,10 @@
  * @file app.js
  * @author José A. Vázquez Mingorance
  * @date 26-02-2025
- * @description Lógica principal de la Spirit Radio LW. Gestiona el barrido aleatorio de audio,
- * el análisis de frecuencias para el visualizador y la síntesis de voz (EVP) con 
- * protocolos de seguridad anti-bloqueo.
+ * @description Lógica principal de la Spirit Radio LW con efectos 
+ * de audio paranormal y sincronización con el visualizador.
  */
+
 let running = false;
 const msgEl = document.getElementById("message");
 const btnToggle = document.getElementById("btnToggle");
@@ -18,122 +18,102 @@ const dialWrapper = document.querySelector(".dial-wrapper");
 let radioTimerId = null;
 let paranormalTimerId = null;
 let displayUpdateId = null;
-let phrases = [];
+let phrases = ["ESTOY AQUÍ", "TE ESCUCHO", "CORRE", "AYUDA", "NO TE VAYAS", "LUZ", "FRÍO"];
 let isSpeaking = false; 
 
-// --- MOTOR DE AUDIO ---
-let audioCtx, analyser, dataArray;
+// --- MOTOR DE AUDIO Y FILTROS ---
+let audioCtx, analyser, dataArray, biquadFilter;
 let visualWindow = null;
 
 function initAudioAnalysis() {
     if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         analyser = audioCtx.createAnalyser();
+        
+        // Cambio 1: Filtro de audio para distorsión paranormal
+        biquadFilter = audioCtx.createBiquadFilter();
+        biquadFilter.type = "lowpass";
+        biquadFilter.frequency.setValueAtTime(20000, audioCtx.currentTime); 
+
         const sourceStatic = audioCtx.createMediaElementSource(staticNoise);
         const sourceRadio = audioCtx.createMediaElementSource(radioBank);
-        sourceStatic.connect(analyser);
-        sourceRadio.connect(analyser);
+        
+        // Conexión en cadena: Fuentes -> Filtro -> Analizador -> Altavoces
+        sourceStatic.connect(biquadFilter);
+        sourceRadio.connect(biquadFilter);
+        biquadFilter.connect(analyser);
         analyser.connect(audioCtx.destination);
+        
         analyser.fftSize = 256; 
         dataArray = new Uint8Array(analyser.frequencyBinCount);
     }
 }
 
 function sendDataToVisualizer() {
-    if (analyser) analyser.getByteFrequencyData(dataArray);
-    if (visualWindow && !visualWindow.closed && running) {
-        let total = 0;
-        for(let i = 0; i < dataArray.length; i++) total += dataArray[i];
-        let audioVolume = (total / dataArray.length) * 2;
-        visualWindow.postMessage({ type: 'AUDIO_UPDATE', volume: audioVolume, isSpeaking: isSpeaking }, '*');
+    if (visualWindow && !visualWindow.closed) {
+        analyser.getByteFrequencyData(dataArray);
+        const avgVol = dataArray.reduce((a, b) => a + b) / dataArray.length;
+        
+        visualWindow.postMessage({
+            type: 'AUDIO_UPDATE',
+            volume: avgVol,
+            isSpeaking: isSpeaking
+        }, '*');
     }
 }
 
-// --- LÓGICA DE RADIO (BARRIDO) ---
+// --- LÓGICA DE EVENTOS ---
+
 function playRandomRadioSlice() {
-    if (!running || isSpeaking) return;
-    clearTimeout(radioTimerId);
-
-    const duration = radioBank.duration || 10;
-    radioBank.currentTime = Math.random() * duration;
-    radioBank.volume = Math.random() * 0.4 + 0.2;
-    
-    radioBank.play().then(() => {
-        const sliceDuration = Math.random() * 400 + 200; 
-        radioTimerId = setTimeout(() => {
-            radioBank.pause();
-            if (running && !isSpeaking) {
-                radioTimerId = setTimeout(playRandomRadioSlice, Math.random() * 1000 + 200);
-            }
-        }, sliceDuration);
-    }).catch(() => {
-        radioTimerId = setTimeout(playRandomRadioSlice, 500);
-    });
+    if (!running) return;
+    const duration = radioBank.duration;
+    if (duration) {
+        radioBank.currentTime = Math.random() * duration;
+        radioBank.play();
+        const nextSlice = 2000 + Math.random() * 5000;
+        radioTimerId = setTimeout(playRandomRadioSlice, nextSlice);
+    }
 }
-
-// --- LÓGICA DE VOZ (CON ANTI-BLOQUEO) ---
-fetch('phrases.json').then(res => res.json()).then(data => phrases = data.phrases);
 
 function triggerParanormalEvent() {
-    if (!running || phrases.length === 0 || isSpeaking) return;
+    if (!running || isSpeaking || Math.random() > 0.4) return;
 
     isSpeaking = true;
-    clearTimeout(radioTimerId);
-    radioBank.pause();
-
     msgEl.classList.add('evp-active');
-    msgEl.textContent = "SINTONIZANDO...";
-
-    // Seguridad: Si en 3 segundos no ha hablado, forzar reset
-    const safetyTimeout = setTimeout(() => {
-        if (msgEl.textContent === "SINTONIZANDO...") {
-            console.log("Voz trabada, reseteando...");
-            resetAfterVoice();
-        }
-    }, 4000);
-
-    setTimeout(() => {
-        if (!running) return;
-        const text = phrases[Math.floor(Math.random() * phrases.length)];
-        
-        window.speechSynthesis.cancel(); // Limpiar cola previa
-        const utter = new SpeechSynthesisUtterance(text);
-        utter.lang = 'es-ES';
-        utter.pitch = 0.1;
-        utter.rate = 0.6;
-
-        utter.onstart = () => {
-            clearTimeout(safetyTimeout);
-            msgEl.textContent = text.toUpperCase();
-        };
-        
-        utter.onend = () => resetAfterVoice();
-        utter.onerror = () => resetAfterVoice();
-
-        window.speechSynthesis.speak(utter);
-    }, 1500);
-}
-
-function resetAfterVoice() {
-    isSpeaking = false;
-    msgEl.classList.remove('evp-active');
-    if (running) playRandomRadioSlice();
-}
-
-// --- CONTROLES ---
-function startRadio() {
-    initAudioAnalysis();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
     
-    // TRUCO: Desbloquear voz con un mensaje vacío al inicio
-    const unlock = new SpeechSynthesisUtterance("");
-    window.speechSynthesis.speak(unlock);
+    // Aplicamos distorsión al audio de fondo (ruido sordo)
+    if(biquadFilter) {
+        biquadFilter.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.5);
+    }
 
+    const phrase = phrases[Math.floor(Math.random() * phrases.length)];
+    msgEl.textContent = phrase;
+
+    const utterance = new SpeechSynthesisUtterance(phrase);
+    utterance.lang = 'es-ES';
+    utterance.rate = 0.6;
+    utterance.pitch = 0.1;
+
+    utterance.onend = () => {
+        isSpeaking = false;
+        msgEl.classList.remove('evp-active');
+        // Restauramos el audio normal (agudos)
+        if(biquadFilter) {
+            biquadFilter.frequency.exponentialRampToValueAtTime(20000, audioCtx.currentTime + 1);
+        }
+    };
+
+    window.speechSynthesis.speak(utterance);
+}
+
+function startRadio() {
     running = true;
     btnToggle.textContent = "Detener";
     dialEl.classList.remove('paused-anim');
     
-    staticNoise.volume = 0.2;
+    initAudioAnalysis();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    
     staticNoise.play();
     
     displayUpdateId = setInterval(() => {
@@ -147,7 +127,7 @@ function startRadio() {
     }, 50);
     
     playRandomRadioSlice();
-    paranormalTimerId = setInterval(triggerParanormalEvent, 15000); // Cada 15 seg intenta hablar
+    paranormalTimerId = setInterval(triggerParanormalEvent, 10000); 
 }
 
 function stopRadio() {
@@ -155,16 +135,20 @@ function stopRadio() {
     isSpeaking = false;
     btnToggle.textContent = "Iniciar";
     dialEl.classList.add('paused-anim');
+    
     clearInterval(displayUpdateId);
     clearInterval(paranormalTimerId);
     clearTimeout(radioTimerId);
+    
     staticNoise.pause();
     radioBank.pause();
-    // Añadimos esta línea para avisar al visualizador
+    window.speechSynthesis.cancel();
+    
+    // Notificamos al visualizador que se detenga
     if (visualWindow && !visualWindow.closed) {
         visualWindow.postMessage({ type: 'STOP_ALL' }, '*');
     }
-    window.speechSynthesis.cancel();
+
     msgEl.textContent = "OFFLINE";
     msgEl.classList.remove('evp-active');
 }
@@ -174,10 +158,16 @@ btnToggle.onclick = () => {
 };
 
 btnVisualizer.onclick = () => {
-    visualWindow = window.open('visualizer.html', 'SpiritVisualizer', 'width=500,height=600');
+    visualWindow = window.open('visualizer.html', 'SpiritVisualizer', 'width=800,height=600');
 };
 
-// Modal (Simplificado)
+// --- MODAL INFO ---
 const modal = document.getElementById("infoModal");
-document.getElementById("btnInfo").onclick = () => modal.style.display = "block";
-document.querySelector(".close").onclick = () => modal.style.display = "none";
+const btnInfo = document.getElementById("btnInfo");
+const spanClose = document.getElementsByClassName("close")[0];
+
+btnInfo.onclick = () => modal.style.display = "block";
+spanClose.onclick = () => modal.style.display = "none";
+window.onclick = (event) => {
+    if (event.target == modal) modal.style.display = "none";
+};
