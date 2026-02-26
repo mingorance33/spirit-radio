@@ -4,23 +4,30 @@
     <meta charset="UTF-8">
     <title>Ultra Visualizer - Spirit Radio</title>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; font-family: 'Courier New', monospace; }
+        body { 
+            margin: 0; 
+            background: #000; 
+            overflow: hidden; 
+            font-family: 'Courier New', monospace; 
+        }
         #container { width: 100vw; height: 100vh; }
         .ui-overlay {
-            position: absolute; top: 10px; left: 10px; color: #0ff;
+            position: absolute; top: 15px; left: 15px; color: #0ff;
             pointer-events: none; text-transform: uppercase; letter-spacing: 2px;
-            font-size: 12px; text-shadow: 0 0 10px #0ff;
+            font-size: 12px; text-shadow: 0 0 8px #0ff;
+            z-index: 10;
         }
         #btnClose {
-            position: fixed; top: 10px; right: 10px; background: none;
+            position: fixed; top: 10px; right: 10px; background: rgba(0,0,0,0.5);
             color: #ff3333; border: 1px solid #ff3333; cursor: pointer;
-            padding: 5px 10px; z-index: 100;
+            padding: 8px 12px; z-index: 100; border-radius: 4px;
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
-    <button id="btnClose" onclick="window.close()">CERRAR VÍNCULO</button>
-    <div class="ui-overlay">VINCULANDO ESPECTRO... <span id="status">Buscando</span></div>
+    <button id="btnClose" onclick="window.close()">X</button>
+    <div class="ui-overlay">ESTADO: <span id="status">ESCANEANDO ESPECTRO</span></div>
     <div id="container"></div>
 
     <script type="importmap">
@@ -40,16 +47,20 @@
 
         let scene, camera, renderer, composer;
         let waves = [];
-        let vol = 0, isSpeaking = false, paranormalIntensity = 0;
+        let vol = 0, isSpeaking = false;
+        
+        // Colores originales basados en tus sensores
+        const defaultColors = [0xff3333, 0x33ff33, 0x33aaff, 0xffcc00];
 
         // --- CONEXIÓN CON APP.JS ---
         window.onmessage = (e) => {
             if(e.data.type === 'AUDIO_UPDATE') {
                 vol = e.data.volume || 0;
-                if (!isSpeaking && e.data.isSpeaking) paranormalIntensity = 2.0;
                 isSpeaking = e.data.isSpeaking;
-                document.getElementById('status').innerText = isSpeaking ? "ENTIDAD DETECTADA" : "BARRIDO RF";
-                document.getElementById('status').style.color = isSpeaking ? "#ff00ff" : "#0ff";
+                
+                const statusEl = document.getElementById('status');
+                statusEl.innerText = isSpeaking ? "ENTIDAD DETECTADA" : "BARRIDO RF";
+                statusEl.style.color = isSpeaking ? "#ff00ff" : "#0ff";
             }
         };
 
@@ -63,30 +74,37 @@
             renderer.setPixelRatio(window.devicePixelRatio);
             document.getElementById('container').appendChild(renderer.domElement);
 
-            // --- POST-PROCESADO (EL SECRETO DEL BRILLO) ---
+            // --- POST-PROCESADO (PARA EL BRILLO NEÓN) ---
             const renderScene = new RenderPass(scene, camera);
             const bloomPass = new UnrealBloomPass(
                 new THREE.Vector2(window.innerWidth, window.innerHeight),
-                1.5, // Fuerza del brillo
-                0.4, // Radio
-                0.85 // Umbral
+                2.0,  // Fuerza del brillo
+                0.5,  // Radio
+                0.1   // Umbral
             );
+            
             composer = new EffectComposer(renderer);
             composer.addPass(renderScene);
             composer.addPass(bloomPass);
 
-            // Crear 4 ondas (RF, Kinetic, Magnetic, Infrared)
-            const colors = [0xff3333, 0x33ff33, 0x33aaff, 0xffcc00];
+            // Crear las 4 ondas
             for (let i = 0; i < 4; i++) {
                 const geometry = new THREE.BufferGeometry();
                 const points = [];
-                for (let x = -5; x < 5; x += 0.05) {
+                // Creamos una línea con 200 segmentos para suavidad
+                for (let x = -6; x < 6; x += 0.05) {
                     points.push(new THREE.Vector3(x, 0, 0));
                 }
                 geometry.setFromPoints(points);
-                const material = new THREE.LineBasicMaterial({ color: colors[i], linewidth: 2 });
+                
+                const material = new THREE.LineBasicMaterial({ 
+                    color: defaultColors[i], 
+                    transparent: true,
+                    opacity: 0.8
+                });
+                
                 const line = new THREE.Line(geometry, material);
-                line.position.y = 1.5 - (i * 1.0);
+                line.position.y = 1.8 - (i * 1.2); // Posicionamiento vertical
                 scene.add(line);
                 waves.push(line);
             }
@@ -94,39 +112,49 @@
 
         function animate() {
             requestAnimationFrame(animate);
-            const time = Date.now() * 0.005;
+            const time = Date.now() * 0.004;
 
             waves.forEach((line, i) => {
                 const positions = line.geometry.attributes.position.array;
-                const colorBase = isSpeaking ? new THREE.Color(0xff00ff) : line.material.color;
+                
+                // --- GESTIÓN DE COLOR CORREGIDA ---
+                // Si habla, el color objetivo es blanco; si no, su color original
+                const targetColor = new THREE.Color(isSpeaking ? 0xffffff : defaultColors[i]);
+                line.material.color.lerp(targetColor, 0.08); // Suaviza la vuelta al color
 
+                // --- GESTIÓN DE MOVIMIENTO ---
                 for (let j = 0; j < positions.length; j += 3) {
                     const x = positions[j];
                     
-                    // Lógica de onda: Senoidal + Volumen + Ruido Paranormal
-                    const freq = 2 + i;
-                    const amp = (vol * 0.05) + (isSpeaking ? 0.5 : 0.1);
-                    const noise = (Math.random() - 0.5) * (paranormalIntensity * 0.5);
+                    // Frecuencia y amplitud base
+                    let freq = (2 + i) * 0.8;
+                    let amp = (vol * 0.06) + 0.1;
                     
-                    // Efecto de "atenuación" en los bordes para que no corten
-                    const edgeMask = Math.cos(x / 3.5); 
+                    // Modificadores si hay "voz" paranormal
+                    if (isSpeaking) {
+                        freq *= 2.5;
+                        amp += 0.5;
+                        // Añadimos ruido (jitter) aleatorio
+                        positions[j + 1] += (Math.random() - 0.5) * 0.1;
+                    }
+
+                    // Máscara para que los bordes de la línea no se corten bruscamente
+                    const edgeMask = Math.cos(x / 4.0);
                     
-                    positions[j + 1] = Math.sin(x * freq + time) * amp * edgeMask + noise;
+                    // Ecuación de la onda
+                    const y = Math.sin(x * freq + time + i) * amp * edgeMask;
+                    
+                    // Aplicar posición y (suavizada ligeramente)
+                    positions[j + 1] = THREE.MathUtils.lerp(positions[j + 1], y, 0.2);
                 }
-                line.geometry.attributes.position.needsUpdate = true;
                 
-                // Animación de color si hay voz
-                if(isSpeaking) {
-                    line.material.color.lerp(new THREE.Color(0xffffff), 0.1);
-                } else {
-                    line.material.color.lerp(new THREE.Color(line.material.color), 0.1);
-                }
+                line.geometry.attributes.position.needsUpdate = true;
             });
 
-            paranormalIntensity *= 0.95; // Decaimiento
             composer.render();
         }
 
+        // Ajuste de pantalla al redimensionar
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
