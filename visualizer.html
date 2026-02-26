@@ -2,25 +2,25 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Spirit Radio - Espectro Dinámico</title>
+    <title>Spirit Radio - Ultra Visualizer</title>
     <style>
         body { margin: 0; background: #000; overflow: hidden; font-family: 'Courier New', monospace; }
         #container { width: 100vw; height: 100vh; }
         .ui-overlay {
             position: absolute; top: 15px; left: 15px; color: #0ff;
             pointer-events: none; text-transform: uppercase; letter-spacing: 2px;
-            font-size: 12px; text-shadow: 0 0 8px #0ff; z-index: 10;
+            font-size: 11px; text-shadow: 0 0 8px #0ff; z-index: 10;
         }
         #btnClose {
             position: fixed; top: 10px; right: 10px; background: rgba(0,0,0,0.5);
             color: #ff3333; border: 1px solid #ff3333; cursor: pointer;
-            padding: 8px 12px; z-index: 100; border-radius: 4px; font-weight: bold;
+            padding: 8px 12px; z-index: 100; border-radius: 4px;
         }
     </style>
 </head>
 <body>
     <button id="btnClose" onclick="window.close()">X</button>
-    <div class="ui-overlay">BARRIDO: <span id="status">ACTIVO</span></div>
+    <div class="ui-overlay">SISTEMA: <span id="status">BARRIDO ACTIVO</span></div>
     <div id="container"></div>
 
     <script type="importmap">
@@ -41,14 +41,13 @@
         let scene, camera, renderer, composer;
         let waves = [];
         let vol = 0, isSpeaking = false;
-        
         const defaultColors = [0xff3333, 0x33ff33, 0x33aaff, 0xffcc00];
 
         window.onmessage = (e) => {
             if(e.data.type === 'AUDIO_UPDATE') {
                 vol = e.data.volume || 0;
                 isSpeaking = e.data.isSpeaking;
-                document.getElementById('status').innerText = isSpeaking ? "VOZ DETECTADA" : "BARRIDO RF";
+                document.getElementById('status').innerText = isSpeaking ? "EVP DETECTADO" : "BARRIDO RF";
             }
         };
 
@@ -59,11 +58,11 @@
 
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             document.getElementById('container').appendChild(renderer.domElement);
 
             const renderScene = new RenderPass(scene, camera);
-            const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 2.2, 0.4, 0.1);
+            const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 2.5, 0.4, 0.1);
             composer = new EffectComposer(renderer);
             composer.addPass(renderScene);
             composer.addPass(bloomPass);
@@ -71,18 +70,18 @@
             for (let i = 0; i < 4; i++) {
                 const geometry = new THREE.BufferGeometry();
                 const points = [];
-                for (let x = -6; x < 6; x += 0.05) points.push(new THREE.Vector3(x, 0, 0));
+                for (let x = -7; x < 7; x += 0.05) points.push(new THREE.Vector3(x, 0, 0));
                 geometry.setFromPoints(points);
                 
-                const material = new THREE.LineBasicMaterial({ color: defaultColors[i], transparent: true, opacity: 0.8 });
+                const material = new THREE.LineBasicMaterial({ color: defaultColors[i], transparent: true, opacity: 0.9 });
                 const line = new THREE.Line(geometry, material);
-                line.position.y = 1.8 - (i * 1.2);
+                line.position.y = 2 - (i * 1.3);
                 
-                // Propiedades para aleatoriedad independiente
+                // DATA PERSONALIZADA PARA CADA ONDA
                 line.userData = { 
-                    ampStep: Math.random() * 100,
-                    freqStep: Math.random() * 100, // Offset para la longitud de onda
-                    baseFreq: 1.5 + i * 0.5
+                    fStep: Math.random() * 1000, // Paso de frecuencia
+                    aStep: Math.random() * 1000, // Paso de amplitud
+                    speed: 0.002 + (Math.random() * 0.005)
                 };
                 
                 scene.add(line);
@@ -92,42 +91,46 @@
 
         function animate() {
             requestAnimationFrame(animate);
-            const time = Date.now() * 0.003;
+            const time = Date.now();
 
             waves.forEach((line, i) => {
                 const positions = line.geometry.attributes.position.array;
                 
-                // Actualizamos pasos de aleatoriedad
-                line.userData.ampStep += 0.015;
-                line.userData.freqStep += 0.01;
+                // EVOLUCIÓN ALEATORIA DE LA ONDA
+                line.userData.fStep += 0.005;
+                line.userData.aStep += 0.007;
 
-                // Variación de Longitud de Onda (Frecuencia)
-                // Esto hace que la onda se estire y encoja aleatoriamente
-                const freqVariation = line.userData.baseFreq + Math.sin(line.userData.freqStep) * 1.2;
+                // Calculamos la frecuencia (longitud de onda) dinámicamente
+                // Esto hace que la onda se "estire" y "encoja" sola
+                const dynamicFreq = (1.5 + i) + Math.sin(line.userData.fStep) * 2.0;
                 
-                // Variación de Amplitud
-                const ampVariation = (vol * 0.05) + Math.abs(Math.cos(line.userData.ampStep)) * 0.25;
+                // Calculamos la amplitud (altura) dinámica
+                const dynamicAmp = (vol * 0.08) + 0.1 + (Math.abs(Math.cos(line.userData.aStep)) * 0.3);
 
+                // Gestión de Color (Blanco si habla, original si no)
                 const targetColor = new THREE.Color(isSpeaking ? 0xffffff : defaultColors[i]);
                 line.material.color.lerp(targetColor, 0.1);
 
                 for (let j = 0; j < positions.length; j += 3) {
                     const x = positions[j];
                     
-                    let currentFreq = freqVariation;
-                    let currentAmp = ampVariation;
+                    let f = dynamicFreq;
+                    let a = dynamicAmp;
 
                     if (isSpeaking) {
-                        currentFreq *= 2.0; // Se acelera al detectar voz
-                        currentAmp += 0.4;
-                        positions[j + 1] += (Math.random() - 0.5) * 0.1; // Ruido
+                        f *= 2.5; // Frecuencia frenética cuando hay entidad
+                        a += 0.5;
+                        positions[j + 1] += (Math.random() - 0.5) * 0.12; // Jitter/Glitch
                     }
 
-                    const edgeMask = Math.cos(x / 4.0);
-                    const y = Math.sin(x * currentFreq + time) * currentAmp * edgeMask;
+                    // Máscara de bordes (fade out lateral)
+                    const mask = Math.pow(Math.cos(x / 5), 2);
                     
-                    // Suavizado de movimiento (lerp de posición)
-                    positions[j + 1] = THREE.MathUtils.lerp(positions[j + 1], y, 0.15);
+                    // Función de onda final
+                    const newY = Math.sin(x * f + (time * line.userData.speed)) * a * mask;
+                    
+                    // Suavizado de transición de posición (para que no vibre feo)
+                    positions[j + 1] = THREE.MathUtils.lerp(positions[j + 1], newY, 0.2);
                 }
                 
                 line.geometry.attributes.position.needsUpdate = true;
