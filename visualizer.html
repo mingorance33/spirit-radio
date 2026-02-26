@@ -2,30 +2,38 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Spirit Radio - Espectro Sutil</title>
+    <title>Spirit Radio - Visualizador Pro</title>
     <style>
         body { margin: 0; background: #000; overflow: hidden; font-family: 'Courier New', monospace; }
         #container { width: 100vw; height: 100vh; }
         
+        /* BOTÓN DE CIERRE MÁS GRANDE */
         #btnClose {
-            position: fixed; top: 20px; right: 20px; 
-            background: rgba(20, 0, 0, 0.4); color: #ff3333; 
-            border: 1px solid #ff3333; cursor: pointer;
-            width: 40px; height: 40px; z-index: 9999;
-            border-radius: 50%; font-weight: bold;
+            position: fixed; top: 30px; right: 30px; 
+            background: rgba(255, 0, 0, 0.2); color: #ff3333; 
+            border: 3px solid #ff3333; cursor: pointer;
+            width: 70px; height: 70px; z-index: 9999;
+            border-radius: 50%; font-weight: bold; font-size: 30px;
             display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 0 20px rgba(255, 0, 0, 0.4);
+            transition: all 0.2s ease;
         }
+        #btnClose:active { transform: scale(0.9); background: #ff3333; color: #000; }
 
+        /* TEXTO DE ESTADO MÁS GRANDE */
         .ui-overlay {
-            position: absolute; top: 20px; left: 20px; color: #0ff;
-            pointer-events: none; text-transform: uppercase; letter-spacing: 2px;
-            font-size: 10px; opacity: 0.7; z-index: 10;
+            position: absolute; top: 35px; left: 30px; color: #0ff;
+            pointer-events: none; text-transform: uppercase; letter-spacing: 3px;
+            font-size: 22px; /* Tamaño aumentado */
+            text-shadow: 0 0 12px #0ff; z-index: 10;
+            font-weight: bold;
         }
+        #status { transition: color 0.3s ease; }
     </style>
 </head>
 <body>
     <button id="btnClose" onclick="window.close()">X</button>
-    <div class="ui-overlay">SISTEMA: <span id="status">BARRIDO SILENCIOSO</span></div>
+    <div class="ui-overlay">ESTADO: <span id="status">BARRIDO RF</span></div>
     <div id="container"></div>
 
     <script type="importmap">
@@ -53,10 +61,15 @@
                 isPaused = false;
                 vol = e.data.volume || 0;
                 isSpeaking = e.data.isSpeaking;
-                document.getElementById('status').innerText = isSpeaking ? "¡ACTIVIDAD DETECTADA!" : "BARRIDO RF";
-                document.getElementById('status').style.color = isSpeaking ? "#ff0000" : "#0ff";
+                const statusEl = document.getElementById('status');
+                statusEl.innerText = isSpeaking ? "¡ENTIDAD DETECTADA!" : "BARRIDO ACTIVO";
+                statusEl.style.color = isSpeaking ? "#ff0000" : "#0ff";
             }
-            if(e.data.type === 'STOP_ALL') isPaused = true;
+            if(e.data.type === 'STOP_ALL') {
+                isPaused = true;
+                document.getElementById('status').innerText = "CONGELADO - OFFLINE";
+                document.getElementById('status').style.color = "#555";
+            }
         };
 
         function init() {
@@ -68,11 +81,10 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.getElementById('container').appendChild(renderer.domElement);
 
-            const renderScene = new RenderPass(scene, camera);
-            // Bloom ajustado para que el blanco no "queme" tanto la imagen
-            const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.8, 0.4, 0.2);
+            const renderPass = new RenderPass(scene, camera);
+            const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 2.2, 0.4, 0.1);
             composer = new EffectComposer(renderer);
-            composer.addPass(renderScene);
+            composer.addPass(renderPass);
             composer.addPass(bloomPass);
 
             for (let i = 0; i < 4; i++) {
@@ -80,21 +92,16 @@
                 const points = [];
                 for (let x = -8; x < 8; x += 0.12) points.push(new THREE.Vector3(x, 0, 0));
                 geometry.setFromPoints(points);
-                const material = new THREE.LineBasicMaterial({ color: colors[i], transparent: true, opacity: 0.6 });
+                const material = new THREE.LineBasicMaterial({ color: colors[i], transparent: true, opacity: 0.7 });
                 const line = new THREE.Line(geometry, material);
                 line.userData = { fStep: Math.random()*50, aStep: Math.random()*50, speed: 0.003 + (i*0.001) };
                 scene.add(line);
                 waves.push(line);
             }
 
-            // Pool de chispas con material transparente para la sutileza
-            const sparkGeo = new THREE.SphereGeometry(0.03, 6, 6);
-            for(let i=0; i<80; i++) {
-                const sparkMat = new THREE.MeshBasicMaterial({ 
-                    color: 0xffffff, 
-                    transparent: true, 
-                    opacity: 0.5 // Más sutil por defecto
-                });
+            const sparkGeo = new THREE.SphereGeometry(0.04, 8, 8);
+            for(let i=0; i<60; i++) {
+                const sparkMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 });
                 const s = new THREE.Mesh(sparkGeo, sparkMat);
                 s.visible = false;
                 scene.add(s);
@@ -108,16 +115,9 @@
                 s.mesh.position.set(x, y, 0);
                 s.mesh.visible = true;
                 s.life = 1.0;
-                
-                if (isPara) {
-                    s.mesh.material.color.set(0xff0000);
-                    s.mesh.material.opacity = 1.0; // Rojo sólido y brillante
-                    s.mesh.scale.set(5.0, 5.0, 5.0); // Gigante
-                } else {
-                    s.mesh.material.color.set(0xffffff);
-                    s.mesh.material.opacity = 0.3; // Blanco tenue
-                    s.mesh.scale.set(0.8, 0.8, 0.8); // Muy pequeño
-                }
+                s.mesh.material.color.set(isPara ? 0xff0000 : 0xffffff);
+                const size = isPara ? 5.0 : 0.8;
+                s.mesh.scale.set(size, size, size);
             }
         }
 
@@ -126,50 +126,51 @@
             if (isPaused) { composer.render(); return; }
 
             const t = Date.now();
-
             waves.forEach((line, i) => {
                 const pos = line.geometry.attributes.position.array;
-                line.userData.fStep += 0.01;
-                line.userData.aStep += 0.005;
-
-                const freq = (2 + i) + Math.sin(line.userData.fStep) * 1.8;
-                const amp = (vol * 0.12) + 0.25 + (Math.cos(line.userData.aStep) * 0.35);
+                line.userData.fStep += 0.012;
+                line.userData.aStep += 0.006;
+                const freq = (2 + i) + Math.sin(line.userData.fStep) * 2;
+                const amp = (vol * 0.15) + 0.3 + (Math.cos(line.userData.aStep) * 0.4);
 
                 for (let j = 0; j < pos.length; j += 3) {
                     const x = pos[j];
                     const mask = Math.cos(x / 5.5);
                     let y = Math.sin(x * freq + (t * line.userData.speed)) * amp * mask;
-                    if (isSpeaking) y += (Math.random() - 0.5) * 0.3;
+                    if (isSpeaking) y += (Math.random() - 0.5) * 0.4;
                     pos[j + 1] = THREE.MathUtils.lerp(pos[j + 1], y, 0.2);
                 }
                 line.geometry.attributes.position.needsUpdate = true;
                 line.material.color.lerp(new THREE.Color(isSpeaking ? 0xffffff : colors[i]), 0.1);
             });
 
-            // Colisiones con umbral de detección
             for (let i = 0; i < waves.length - 1; i++) {
                 const posA = waves[i].geometry.attributes.position.array;
                 const posB = waves[i+1].geometry.attributes.position.array;
                 for (let j = 0; j < posA.length; j += 3) {
-                    if (Math.abs(posA[j+1] - posB[j+1]) < 0.02) {
-                        // Solo mostramos chispas si hay energía suficiente (amp > 0.2)
-                        if (Math.abs(posA[j+1]) > 0.2) {
-                            triggerSpark(posA[j], posA[j+1], isSpeaking);
-                        }
+                    if (Math.abs(posA[j+1] - posB[j+1]) < 0.02 && Math.abs(posA[j+1]) > 0.2) {
+                        triggerSpark(posA[j], posA[j+1], isSpeaking);
                     }
                 }
             }
 
             sparks.forEach(s => {
                 if (s.mesh.visible) {
-                    s.life -= isSpeaking ? 0.03 : 0.15; // Las chispas sutiles desaparecen muy rápido
-                    s.mesh.scale.multiplyScalar(0.9);
+                    s.life -= isSpeaking ? 0.04 : 0.12;
+                    s.mesh.scale.multiplyScalar(0.92);
                     if (s.life <= 0) s.mesh.visible = false;
                 }
             });
 
             composer.render();
         }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        });
 
         init();
         animate();
