@@ -2,30 +2,55 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Spirit Radio - Espectro Sutil</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Spirit Radio - Análisis Cuántico</title>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; font-family: 'Courier New', monospace; }
+        body { 
+            margin: 0; background: #000; overflow: hidden; 
+            font-family: 'Courier New', monospace;
+            touch-action: none; 
+        }
         #container { width: 100vw; height: 100vh; }
         
         #btnClose {
-            position: fixed; top: 20px; right: 20px; 
-            background: rgba(20, 0, 0, 0.4); color: #ff3333; 
-            border: 1px solid #ff3333; cursor: pointer;
-            width: 40px; height: 40px; z-index: 9999;
-            border-radius: 50%; font-weight: bold;
+            position: fixed; 
+            top: calc(20px + env(safe-area-inset-top)); 
+            right: 20px;
+            background: rgba(255, 0, 0, 0.1); color: #ff3333; 
+            border: 2px solid #ff3333; cursor: pointer;
+            width: 65px; height: 65px; z-index: 9999;
+            border-radius: 50%; font-weight: bold; font-size: 28px;
             display: flex; align-items: center; justify-content: center;
         }
 
         .ui-overlay {
-            position: absolute; top: 20px; left: 20px; color: #0ff;
-            pointer-events: none; text-transform: uppercase; letter-spacing: 2px;
-            font-size: 10px; opacity: 0.7; z-index: 10;
+            position: absolute; 
+            top: calc(25px + env(safe-area-inset-top)); 
+            left: 20px; 
+            color: #0ff;
+            pointer-events: none; text-transform: uppercase;
+            font-size: 20px; text-shadow: 0 0 10px #0ff; z-index: 10;
         }
+
+        .data-panel {
+            position: absolute; color: rgba(0, 255, 255, 0.5);
+            font-size: 11px; pointer-events: none; z-index: 5;
+            line-height: 1.4;
+            min-width: 120px;
+        }
+        .mid-left { top: 40%; left: 15px; }
+        .mid-right { top: 40%; right: 15px; text-align: right; }
+        
+        .highlight { color: #ff3333; font-weight: bold; text-shadow: 0 0 5px #ff0000; }
     </style>
 </head>
 <body>
     <button id="btnClose" onclick="window.close()">X</button>
-    <div class="ui-overlay">SISTEMA: <span id="status">BARRIDO SILENCIOSO</span></div>
+    <div class="ui-overlay">DETECTOR: <span id="status">BARRIDO RF</span></div>
+    
+    <div class="data-panel mid-left" id="panel1">Iniciando...</div>
+    <div class="data-panel mid-right" id="panel2">Esperando...</div>
+
     <div id="container"></div>
 
     <script type="importmap">
@@ -48,15 +73,36 @@
         let vol = 0, isSpeaking = false, isPaused = true;
         const colors = [0xff4444, 0x44ff44, 0x4488ff, 0xffcc00];
 
+        function genData() { return (Math.random() * 100).toFixed(8); }
+
+        // BUCLE DE DATOS INDEPENDIENTE (Cambio continuo)
+        function loopData() {
+            if (!isPaused) {
+                const p1 = document.getElementById('panel1');
+                const p2 = document.getElementById('panel2');
+                
+                const noisePrefix = isSpeaking ? "<span class='highlight'>ANOMALÍA</span><br>" : "SENS: " + genData().substring(0,8) + "<br>";
+                
+                p1.innerHTML = noisePrefix + "EM_F: " + genData() + "<br>VOLT: " + (vol/100 + Math.random()*0.01).toFixed(6);
+                p2.innerHTML = "GAIN: " + (vol + Math.random()).toFixed(2) + "db<br>LNCY: " + (Math.random()*0.01).toFixed(6) + "<br>SYNC: " + Date.now().toString().slice(-6);
+            }
+            setTimeout(loopData, 100); // Se actualiza cada 100ms (10 veces por segundo)
+        }
+
         window.onmessage = (e) => {
             if(e.data.type === 'AUDIO_UPDATE') {
                 isPaused = false;
                 vol = e.data.volume || 0;
                 isSpeaking = e.data.isSpeaking;
-                document.getElementById('status').innerText = isSpeaking ? "¡ACTIVIDAD DETECTADA!" : "BARRIDO RF";
-                document.getElementById('status').style.color = isSpeaking ? "#ff0000" : "#0ff";
+                const statusEl = document.getElementById('status');
+                statusEl.innerText = isSpeaking ? "¡ENTIDAD!" : "BARRIDO";
+                statusEl.style.color = isSpeaking ? "#ff0000" : "#0ff";
             }
-            if(e.data.type === 'STOP_ALL') isPaused = true;
+            if(e.data.type === 'STOP_ALL') {
+                isPaused = true;
+                document.getElementById('status').innerText = "OFFLINE";
+                document.getElementById('status').style.color = "#444";
+            }
         };
 
         function init() {
@@ -65,41 +111,38 @@
             camera.position.z = 5;
 
             renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.getElementById('container').appendChild(renderer.domElement);
 
-            const renderScene = new RenderPass(scene, camera);
-            // Bloom ajustado para que el blanco no "queme" tanto la imagen
-            const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.8, 0.4, 0.2);
+            const renderPass = new RenderPass(scene, camera);
+            const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 2.2, 0.4, 0.1);
             composer = new EffectComposer(renderer);
-            composer.addPass(renderScene);
+            composer.addPass(renderPass);
             composer.addPass(bloomPass);
 
             for (let i = 0; i < 4; i++) {
                 const geometry = new THREE.BufferGeometry();
                 const points = [];
-                for (let x = -8; x < 8; x += 0.12) points.push(new THREE.Vector3(x, 0, 0));
+                for (let x = -8; x < 8; x += 0.2) points.push(new THREE.Vector3(x, 0, 0));
                 geometry.setFromPoints(points);
-                const material = new THREE.LineBasicMaterial({ color: colors[i], transparent: true, opacity: 0.6 });
+                const material = new THREE.LineBasicMaterial({ color: colors[i], transparent: true, opacity: 0.7 });
                 const line = new THREE.Line(geometry, material);
                 line.userData = { fStep: Math.random()*50, aStep: Math.random()*50, speed: 0.003 + (i*0.001) };
                 scene.add(line);
                 waves.push(line);
             }
 
-            // Pool de chispas con material transparente para la sutileza
-            const sparkGeo = new THREE.SphereGeometry(0.03, 6, 6);
-            for(let i=0; i<80; i++) {
-                const sparkMat = new THREE.MeshBasicMaterial({ 
-                    color: 0xffffff, 
-                    transparent: true, 
-                    opacity: 0.5 // Más sutil por defecto
-                });
+            const sparkGeo = new THREE.SphereGeometry(0.05, 8, 8);
+            for(let i=0; i<40; i++) {
+                const sparkMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
                 const s = new THREE.Mesh(sparkGeo, sparkMat);
                 s.visible = false;
                 scene.add(s);
                 sparks.push({ mesh: s, life: 0 });
             }
+            
+            loopData(); // Iniciar el bucle de números
         }
 
         function triggerSpark(x, y, isPara) {
@@ -108,16 +151,9 @@
                 s.mesh.position.set(x, y, 0);
                 s.mesh.visible = true;
                 s.life = 1.0;
-                
-                if (isPara) {
-                    s.mesh.material.color.set(0xff0000);
-                    s.mesh.material.opacity = 1.0; // Rojo sólido y brillante
-                    s.mesh.scale.set(5.0, 5.0, 5.0); // Gigante
-                } else {
-                    s.mesh.material.color.set(0xffffff);
-                    s.mesh.material.opacity = 0.3; // Blanco tenue
-                    s.mesh.scale.set(0.8, 0.8, 0.8); // Muy pequeño
-                }
+                s.mesh.material.color.set(isPara ? 0xff0000 : 0xffffff);
+                const size = isPara ? 4.5 : 0.8;
+                s.mesh.scale.set(size, size, size);
             }
         }
 
@@ -126,50 +162,50 @@
             if (isPaused) { composer.render(); return; }
 
             const t = Date.now();
-
             waves.forEach((line, i) => {
                 const pos = line.geometry.attributes.position.array;
-                line.userData.fStep += 0.01;
-                line.userData.aStep += 0.005;
-
-                const freq = (2 + i) + Math.sin(line.userData.fStep) * 1.8;
-                const amp = (vol * 0.12) + 0.25 + (Math.cos(line.userData.aStep) * 0.35);
+                line.userData.fStep += 0.012;
+                line.userData.aStep += 0.006;
+                const freq = (2 + i) + Math.sin(line.userData.fStep) * 2;
+                const amp = (vol * 0.15) + 0.3 + (Math.cos(line.userData.aStep) * 0.4);
 
                 for (let j = 0; j < pos.length; j += 3) {
                     const x = pos[j];
                     const mask = Math.cos(x / 5.5);
                     let y = Math.sin(x * freq + (t * line.userData.speed)) * amp * mask;
-                    if (isSpeaking) y += (Math.random() - 0.5) * 0.3;
+                    if (isSpeaking) y += (Math.random() - 0.5) * 0.4;
                     pos[j + 1] = THREE.MathUtils.lerp(pos[j + 1], y, 0.2);
                 }
                 line.geometry.attributes.position.needsUpdate = true;
-                line.material.color.lerp(new THREE.Color(isSpeaking ? 0xffffff : colors[i]), 0.1);
             });
 
-            // Colisiones con umbral de detección
             for (let i = 0; i < waves.length - 1; i++) {
                 const posA = waves[i].geometry.attributes.position.array;
                 const posB = waves[i+1].geometry.attributes.position.array;
                 for (let j = 0; j < posA.length; j += 3) {
-                    if (Math.abs(posA[j+1] - posB[j+1]) < 0.02) {
-                        // Solo mostramos chispas si hay energía suficiente (amp > 0.2)
-                        if (Math.abs(posA[j+1]) > 0.2) {
-                            triggerSpark(posA[j], posA[j+1], isSpeaking);
-                        }
+                    if (Math.abs(posA[j+1] - posB[j+1]) < 0.03 && Math.abs(posA[j+1]) > 0.2) {
+                        triggerSpark(posA[j], posA[j+1], isSpeaking);
                     }
                 }
             }
 
             sparks.forEach(s => {
                 if (s.mesh.visible) {
-                    s.life -= isSpeaking ? 0.03 : 0.15; // Las chispas sutiles desaparecen muy rápido
-                    s.mesh.scale.multiplyScalar(0.9);
+                    s.life -= isSpeaking ? 0.05 : 0.12;
+                    s.mesh.scale.multiplyScalar(0.92);
                     if (s.life <= 0) s.mesh.visible = false;
                 }
             });
 
             composer.render();
         }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        });
 
         init();
         animate();
