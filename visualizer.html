@@ -8,6 +8,7 @@
         body { margin: 0; background: #000; overflow: hidden; font-family: 'Courier New', monospace; touch-action: none; }
         #container { width: 100vw; height: 100vh; }
         
+        /* Botón de cierre reducido al 50% */
         #btnClose {
             position: fixed; top: calc(20px + env(safe-area-inset-top)); right: 20px;
             background: rgba(255, 0, 0, 0.1); color: #ff3333; border: 2px solid #ff3333; cursor: pointer;
@@ -16,7 +17,7 @@
         }
 
         .ui-overlay { position: absolute; top: calc(25px + env(safe-area-inset-top)); left: 20px; color: #0ff; pointer-events: none; text-transform: uppercase; font-size: 20px; text-shadow: 0 0 10px #0ff; z-index: 10; }
-        .data-panel { position: absolute; color: rgba(0, 255, 255, 0.5); font-size: 11px; pointer-events: none; z-index: 5; line-height: 1.4; min-width: 120px; }
+        .data-panel { position: absolute; color: rgba(0, 255, 255, 0.3); font-size: 11px; pointer-events: none; z-index: 5; line-height: 1.4; min-width: 120px; }
         .mid-left { top: 40%; left: 15px; }
         .mid-right { top: 40%; right: 15px; text-align: right; }
         .highlight { color: #ff3333; font-weight: bold; text-shadow: 0 0 5px #ff0000; }
@@ -46,15 +47,29 @@
 
         let scene, camera, renderer, composer, waves = [], sparks = [];
         let vol = 0, isSpeaking = false, isPaused = true;
-        const colors = [0xff4444, 0x44ff44, 0x4488ff, 0xffcc00];
+        // Colores originales más sutiles (menor saturación/brillo)
+        const colorsNormal = [0xaa4444, 0x44aa44, 0x4488aa, 0xaaaa00];
+        const colorPara = 0xff0000; // Rojo intenso para anomalías
 
-        function triggerSpark(x, y, active) {
+        // Función para disparar chispas con efectos visuales paranormales
+        function triggerSpark(x, y, isPara) {
             const spark = sparks.find(s => !s.mesh.visible);
             if (spark) {
                 spark.mesh.position.set(x, y, 0);
                 spark.mesh.visible = true;
                 spark.life = 1.0;
-                spark.mesh.scale.set(1, 1, 1);
+                
+                if (isPara) {
+                    // Chispa paranormal: Roja, grande y brillante
+                    spark.mesh.material.color.set(colorPara);
+                    spark.mesh.scale.set(4.0, 4.0, 4.0);
+                    spark.mesh.material.opacity = 1.0;
+                } else {
+                    // Chispa normal: Blanca, pequeña y sutil
+                    spark.mesh.material.color.set(0xffffff);
+                    spark.mesh.scale.set(0.8, 0.8, 0.8);
+                    spark.mesh.material.opacity = 0.4;
+                }
             }
         }
 
@@ -67,25 +82,27 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.getElementById('container').appendChild(renderer.domElement);
             
+            // Bloom pass para un brillo fantasmal
             const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 2.2, 0.4, 0.1);
             composer = new EffectComposer(renderer);
             composer.addPass(new RenderPass(scene, camera));
             composer.addPass(bloomPass);
 
-            // Crear ondas
+            // Crear ondas con colores normales iniciales
             for (let i = 0; i < 4; i++) {
                 const points = [];
                 for (let x = -8; x < 8; x += 0.2) points.push(new THREE.Vector3(x, 0, 0));
                 const geometry = new THREE.BufferGeometry().setFromPoints(points);
-                const line = new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: colors[i], transparent: true, opacity: 0.7 }));
-                line.userData = { fStep: Math.random()*50, aStep: Math.random()*50, speed: 0.003 + (i*0.001) };
+                // Opacidad inicial baja para sutileza
+                const line = new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: colorsNormal[i], transparent: true, opacity: 0.3 }));
+                line.userData = { fStep: Math.random()*50, aStep: Math.random()*50, speed: 0.003 + (i*0.001), originalColor: colorsNormal[i] };
                 scene.add(line);
                 waves.push(line);
             }
 
-            // Crear pool de chispas
-            for (let i = 0; i < 50; i++) {
-                const mesh = new THREE.Mesh(new THREE.CircleGeometry(0.05, 8), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+            // Crear pool de chispas con material transparente
+            for (let i = 0; i < 60; i++) {
+                const mesh = new THREE.Mesh(new THREE.CircleGeometry(0.05, 8), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 }));
                 mesh.visible = false;
                 scene.add(mesh);
                 sparks.push({ mesh, life: 0 });
@@ -102,16 +119,27 @@
                 line.userData.fStep += 0.012;
                 line.userData.aStep += 0.006;
                 const freq = (2 + i) + Math.sin(line.userData.fStep) * 2;
+                
+                // Amplitud restringida para no salir de pantalla
                 const rawAmp = (vol * 0.15) + 0.3 + (Math.cos(line.userData.aStep) * 0.4);
                 const amp = Math.min(rawAmp, 1.5); 
 
+                // Actualizar estilo de onda según estado paranormal
+                if (isSpeaking) {
+                    line.material.color.set(colorPara); // Onda roja
+                    line.material.opacity = 0.8 + Math.sin(t * 0.02) * 0.2; // Parpadeo
+                } else {
+                    line.material.color.set(line.userData.originalColor); // Color sutil normal
+                    line.material.opacity = 0.3; // Opacidad baja constante
+                }
+
                 for (let j = 0; j < pos.length; j += 3) {
                     const x = pos[j];
-                    const mask = Math.cos(x / 5.5);
+                    const mask = Math.cos(x / 5.5); // Máscara para desvanecer bordes
                     let y = Math.sin(x * freq + (t * line.userData.speed)) * amp * mask;
-                    if (isSpeaking) y += (Math.random() - 0.5) * 0.4;
-                    y = Math.max(-2.5, Math.min(2.5, y));
-                    pos[j + 1] = THREE.MathUtils.lerp(pos[j + 1], y, 0.2);
+                    if (isSpeaking) y += (Math.random() - 0.5) * 0.4; // Distorsión caótica en EVP
+                    y = Math.max(-2.5, Math.min(2.5, y)); // Límite vertical final
+                    pos[j + 1] = THREE.MathUtils.lerp(pos[j + 1], y, 0.2); // Suavizado
                 }
                 line.geometry.attributes.position.needsUpdate = true;
             });
@@ -121,16 +149,20 @@
                 const posA = waves[i].geometry.attributes.position.array;
                 const posB = waves[i+1].geometry.attributes.position.array;
                 for (let j = 0; j < posA.length; j += 3) {
+                    // Detectar proximidad vertical significativa fuera de la línea central
                     if (Math.abs(posA[j+1] - posB[j+1]) < 0.03 && Math.abs(posA[j+1]) > 0.2) {
-                        triggerSpark(posA[j], posA[j+1], isSpeaking);
+                        triggerSpark(posA[j], posA[j+1], isSpeaking); // Disparar chispa
                     }
                 }
             }
 
+            // Animar pool de chispas
             sparks.forEach(s => {
                 if (s.mesh.visible) {
-                    s.life -= isSpeaking ? 0.05 : 0.12;
-                    s.mesh.scale.multiplyScalar(0.92);
+                    // Desvanecimiento y reducción de tamaño
+                    s.life -= isSpeaking ? 0.03 : 0.1; // Chispas paranormales duran más
+                    s.mesh.scale.multiplyScalar(isSpeaking ? 0.96 : 0.9);
+                    s.mesh.material.opacity = s.life * (isSpeaking ? 1.0 : 0.4);
                     if (s.life <= 0) s.mesh.visible = false;
                 }
             });
@@ -138,11 +170,24 @@
             composer.render();
         }
 
+        // Manejo de mensajes desde app.js
         window.onmessage = (e) => {
             if(e.data.type === 'AUDIO_UPDATE') {
                 isPaused = false;
                 vol = e.data.volume || 0;
                 isSpeaking = e.data.isSpeaking;
+                
+                // Actualizar UI superpuesta
+                const statusEl = document.getElementById('status');
+                statusEl.innerText = isSpeaking ? "¡ENTIDAD!" : "BARRIDO RF";
+                statusEl.style.color = isSpeaking ? "#ff0000" : "#0ff";
+                statusEl.style.textShadow = isSpeaking ? "0 0 15px #ff0000" : "0 0 10px #0ff";
+            }
+            if(e.data.type === 'STOP_ALL') {
+                isPaused = true;
+                document.getElementById('status').innerText = "OFFLINE";
+                document.getElementById('status').style.color = "#444";
+                document.getElementById('status').style.textShadow = "none";
             }
         };
 
