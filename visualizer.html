@@ -18,8 +18,9 @@
             right: 20px;
             background: rgba(255, 0, 0, 0.1); color: #ff3333; 
             border: 2px solid #ff3333; cursor: pointer;
-            width: 65px; height: 65px; z-index: 9999;
-            border-radius: 50%; font-weight: bold; font-size: 28px;
+            /* Botón reducido a la mitad (antes 65px/28px) */
+            width: 32px; height: 32px; z-index: 9999;
+            border-radius: 50%; font-weight: bold; font-size: 14px;
             display: flex; align-items: center; justify-content: center;
         }
 
@@ -75,18 +76,15 @@
 
         function genData() { return (Math.random() * 100).toFixed(8); }
 
-        // BUCLE DE DATOS INDEPENDIENTE (Cambio continuo)
         function loopData() {
             if (!isPaused) {
                 const p1 = document.getElementById('panel1');
                 const p2 = document.getElementById('panel2');
-                
                 const noisePrefix = isSpeaking ? "<span class='highlight'>ANOMALÍA</span><br>" : "SENS: " + genData().substring(0,8) + "<br>";
-                
                 p1.innerHTML = noisePrefix + "EM_F: " + genData() + "<br>VOLT: " + (vol/100 + Math.random()*0.01).toFixed(6);
                 p2.innerHTML = "GAIN: " + (vol + Math.random()).toFixed(2) + "db<br>LNCY: " + (Math.random()*0.01).toFixed(6) + "<br>SYNC: " + Date.now().toString().slice(-6);
             }
-            setTimeout(loopData, 100); // Se actualiza cada 100ms (10 veces por segundo)
+            setTimeout(loopData, 100);
         }
 
         window.onmessage = (e) => {
@@ -109,12 +107,10 @@
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
             camera.position.z = 5;
-
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.getElementById('container').appendChild(renderer.domElement);
-
             const renderPass = new RenderPass(scene, camera);
             const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 2.2, 0.4, 0.1);
             composer = new EffectComposer(renderer);
@@ -132,29 +128,7 @@
                 scene.add(line);
                 waves.push(line);
             }
-
-            const sparkGeo = new THREE.SphereGeometry(0.05, 8, 8);
-            for(let i=0; i<40; i++) {
-                const sparkMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-                const s = new THREE.Mesh(sparkGeo, sparkMat);
-                s.visible = false;
-                scene.add(s);
-                sparks.push({ mesh: s, life: 0 });
-            }
-            
-            loopData(); // Iniciar el bucle de números
-        }
-
-        function triggerSpark(x, y, isPara) {
-            let s = sparks.find(sp => !sp.mesh.visible);
-            if (s) {
-                s.mesh.position.set(x, y, 0);
-                s.mesh.visible = true;
-                s.life = 1.0;
-                s.mesh.material.color.set(isPara ? 0xff0000 : 0xffffff);
-                const size = isPara ? 4.5 : 0.8;
-                s.mesh.scale.set(size, size, size);
-            }
+            loopData();
         }
 
         function animate() {
@@ -167,45 +141,25 @@
                 line.userData.fStep += 0.012;
                 line.userData.aStep += 0.006;
                 const freq = (2 + i) + Math.sin(line.userData.fStep) * 2;
-                const amp = (vol * 0.15) + 0.3 + (Math.cos(line.userData.aStep) * 0.4);
+                
+                // Amplitud restringida para no salir de pantalla
+                const rawAmp = (vol * 0.15) + 0.3 + (Math.cos(line.userData.aStep) * 0.4);
+                const amp = Math.min(rawAmp, 1.5); 
 
                 for (let j = 0; j < pos.length; j += 3) {
                     const x = pos[j];
                     const mask = Math.cos(x / 5.5);
                     let y = Math.sin(x * freq + (t * line.userData.speed)) * amp * mask;
                     if (isSpeaking) y += (Math.random() - 0.5) * 0.4;
+                    
+                    // Límite vertical final (Clamp)
+                    y = Math.max(-2.5, Math.min(2.5, y));
                     pos[j + 1] = THREE.MathUtils.lerp(pos[j + 1], y, 0.2);
                 }
                 line.geometry.attributes.position.needsUpdate = true;
             });
-
-            for (let i = 0; i < waves.length - 1; i++) {
-                const posA = waves[i].geometry.attributes.position.array;
-                const posB = waves[i+1].geometry.attributes.position.array;
-                for (let j = 0; j < posA.length; j += 3) {
-                    if (Math.abs(posA[j+1] - posB[j+1]) < 0.03 && Math.abs(posA[j+1]) > 0.2) {
-                        triggerSpark(posA[j], posA[j+1], isSpeaking);
-                    }
-                }
-            }
-
-            sparks.forEach(s => {
-                if (s.mesh.visible) {
-                    s.life -= isSpeaking ? 0.05 : 0.12;
-                    s.mesh.scale.multiplyScalar(0.92);
-                    if (s.life <= 0) s.mesh.visible = false;
-                }
-            });
-
             composer.render();
         }
-
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            composer.setSize(window.innerWidth, window.innerHeight);
-        });
 
         init();
         animate();
