@@ -1,12 +1,12 @@
 /**
  * @file app.js
- * @description Lógica optimizada para compatibilidad con iOS y Android.
+ * @author José A. Vázquez Mingorance
+ * @date 26-02-2025
+ * @description Lógica principal de la Spirit Radio LW. Gestiona el barrido aleatorio de audio,
+ * el análisis de frecuencias para el visualizador y la síntesis de voz (EVP) con 
+ * protocolos de seguridad anti-bloqueo.
  */
-
 let running = false;
-let isSpeaking = false;
-let wakeLock = null;
-
 const msgEl = document.getElementById("message");
 const btnToggle = document.getElementById("btnToggle");
 const btnVisualizer = document.getElementById("btnVisualizer");
@@ -19,19 +19,12 @@ let radioTimerId = null;
 let paranormalTimerId = null;
 let displayUpdateId = null;
 let phrases = [];
+let isSpeaking = false; 
+
+// --- MOTOR DE AUDIO ---
 let audioCtx, analyser, dataArray;
 let visualWindow = null;
 
-// --- GESTIÓN DE PANTALLA ---
-async function requestWakeLock() {
-    if ('wakeLock' in navigator) {
-        try {
-            wakeLock = await navigator.wakeLock.request('screen');
-        } catch (err) { console.warn("Wake Lock error:", err); }
-    }
-}
-
-// --- INICIALIZACIÓN AUDIO ---
 function initAudioAnalysis() {
     if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -41,96 +34,120 @@ function initAudioAnalysis() {
         sourceStatic.connect(analyser);
         sourceRadio.connect(analyser);
         analyser.connect(audioCtx.destination);
-        analyser.fftSize = 256;
+        analyser.fftSize = 256; 
         dataArray = new Uint8Array(analyser.frequencyBinCount);
     }
 }
 
-// --- LÓGICA RADIO (10-20 SEG) ---
+function sendDataToVisualizer() {
+    if (analyser) analyser.getByteFrequencyData(dataArray);
+    if (visualWindow && !visualWindow.closed && running) {
+        let total = 0;
+        for(let i = 0; i < dataArray.length; i++) total += dataArray[i];
+        let audioVolume = (total / dataArray.length) * 2;
+        visualWindow.postMessage({ type: 'AUDIO_UPDATE', volume: audioVolume, isSpeaking: isSpeaking }, '*');
+    }
+}
+
+// --- LÓGICA DE RADIO (BARRIDO) ---
 function playRandomRadioSlice() {
     if (!running || isSpeaking) return;
+    clearTimeout(radioTimerId);
+
     const duration = radioBank.duration || 10;
-    radioBank.currentTime = Math.random() * (duration - 1);
+    radioBank.currentTime = Math.random() * duration;
+    radioBank.volume = Math.random() * 0.4 + 0.2;
     
     radioBank.play().then(() => {
-        const sliceDuration = 400 + Math.random() * 400;
-        setTimeout(() => {
+        const sliceDuration = Math.random() * 400 + 200; 
+        radioTimerId = setTimeout(() => {
             radioBank.pause();
-            if (running) {
-                const nextInterval = 10000 + Math.random() * 10000;
-                radioTimerId = setTimeout(playRandomRadioSlice, nextInterval);
+            if (running && !isSpeaking) {
+                radioTimerId = setTimeout(playRandomRadioSlice, Math.random() * 1000 + 200);
             }
         }, sliceDuration);
-    }).catch(e => console.warn("Audio radio bloqueado por iOS:", e));
+    }).catch(() => {
+        radioTimerId = setTimeout(playRandomRadioSlice, 500);
+    });
 }
 
-// --- LÓGICA VOZ (10-20 SEG) ---
+// --- LÓGICA DE VOZ (CON ANTI-BLOQUEO) ---
+fetch('phrases.json').then(res => res.json()).then(data => phrases = data.phrases);
+
 function triggerParanormalEvent() {
-    if (!running || isSpeaking || phrases.length === 0) return;
+    if (!running || phrases.length === 0 || isSpeaking) return;
+
     isSpeaking = true;
-    
-    // Feedback táctil para iOS/Android
-    if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+    clearTimeout(radioTimerId);
+    radioBank.pause();
 
     msgEl.classList.add('evp-active');
-    const randomPhrase = phrases[Math.floor(Math.random() * phrases.length)];
-    
-    const utter = new SpeechSynthesisUtterance(randomPhrase);
-    utter.lang = 'es-ES';
-    utter.pitch = 0.5;
-    utter.rate = 0.7;
+    msgEl.textContent = "SINTONIZANDO...";
 
-    utter.onstart = () => { msgEl.textContent = randomPhrase; };
-    utter.onerror = (e) => { 
-        console.error("Speech Error:", e);
-        msgEl.textContent = "ERROR VOZ";
-    };
-    utter.onend = () => {
-        isSpeaking = false;
-        msgEl.classList.remove('evp-active');
-        if (running) {
-            const nextDelay = 10000 + Math.random() * 10000;
-            paranormalTimerId = setTimeout(triggerParanormalEvent, nextDelay);
+    // Seguridad: Si en 3 segundos no ha hablado, forzar reset
+    const safetyTimeout = setTimeout(() => {
+        if (msgEl.textContent === "SINTONIZANDO...") {
+            console.log("Voz trabada, reseteando...");
+            resetAfterVoice();
         }
-    };
-    window.speechSynthesis.speak(utter);
+    }, 4000);
+
+    setTimeout(() => {
+        if (!running) return;
+        const text = phrases[Math.floor(Math.random() * phrases.length)];
+        
+        window.speechSynthesis.cancel(); // Limpiar cola previa
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = 'es-ES';
+        utter.pitch = 0.1;
+        utter.rate = 0.6;
+
+        utter.onstart = () => {
+            clearTimeout(safetyTimeout);
+            msgEl.textContent = text.toUpperCase();
+        };
+        
+        utter.onend = () => resetAfterVoice();
+        utter.onerror = () => resetAfterVoice();
+
+        window.speechSynthesis.speak(utter);
+    }, 1500);
 }
 
-// --- INICIO ---
-async function startRadio() {
+function resetAfterVoice() {
+    isSpeaking = false;
+    msgEl.classList.remove('evp-active');
+    if (running) playRandomRadioSlice();
+}
+
+// --- CONTROLES ---
+function startRadio() {
     initAudioAnalysis();
-    if (audioCtx.state === 'suspended') await audioCtx.resume();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
     
-    // Truco iOS: Forzar evento de habla vacío para desbloquear permisos
+    // TRUCO: Desbloquear voz con un mensaje vacío al inicio
     const unlock = new SpeechSynthesisUtterance("");
     window.speechSynthesis.speak(unlock);
-    
-    await requestWakeLock();
 
     running = true;
     btnToggle.textContent = "Detener";
     dialEl.classList.remove('paused-anim');
     
-    staticNoise.loop = true;
-    staticNoise.volume = 0.25; 
-    staticNoise.play().catch(e => console.warn("Static bloqueado:", e));
+    staticNoise.volume = 0.2;
+    staticNoise.play();
     
     displayUpdateId = setInterval(() => {
-        if (!isSpeaking) {
+        if (!isSpeaking && running) {
             const dialRect = dialEl.getBoundingClientRect();
             const wrapperRect = dialWrapper.getBoundingClientRect();
             const percent = Math.max(0, Math.min(1, (dialRect.left - wrapperRect.left) / (wrapperRect.width - dialRect.width)));
             msgEl.textContent = `${(153.000 + (percent * 128.000)).toFixed(3)} kHz`;
         }
-        if (visualWindow && !visualWindow.closed && analyser) {
-            analyser.getByteFrequencyData(dataArray);
-            let avg = dataArray.reduce((a, b) => a + b) / dataArray.length;
-            visualWindow.postMessage({ type: 'AUDIO_UPDATE', volume: avg, isSpeaking }, '*');
-        }
+        sendDataToVisualizer();
     }, 50);
     
     playRandomRadioSlice();
-    paranormalTimerId = setTimeout(triggerParanormalEvent, 10000 + Math.random() * 10000);
+    paranormalTimerId = setInterval(triggerParanormalEvent, 15000); // Cada 15 seg intenta hablar
 }
 
 function stopRadio() {
@@ -138,21 +155,29 @@ function stopRadio() {
     isSpeaking = false;
     btnToggle.textContent = "Iniciar";
     dialEl.classList.add('paused-anim');
-    if (wakeLock) wakeLock.release().then(() => wakeLock = null);
     clearInterval(displayUpdateId);
-    clearTimeout(paranormalTimerId);
+    clearInterval(paranormalTimerId);
     clearTimeout(radioTimerId);
     staticNoise.pause();
     radioBank.pause();
+    // Añadimos esta línea para avisar al visualizador
+    if (visualWindow && !visualWindow.closed) {
+        visualWindow.postMessage({ type: 'STOP_ALL' }, '*');
+    }
     window.speechSynthesis.cancel();
     msgEl.textContent = "OFFLINE";
     msgEl.classList.remove('evp-active');
 }
 
-btnToggle.onclick = () => { if (running) stopRadio(); else startRadio(); };
-btnVisualizer.onclick = () => { visualWindow = window.open('visualizer.html', 'SpiritVisualizer', 'width=500,height=600'); };
+btnToggle.onclick = () => {
+    if (running) stopRadio(); else startRadio();
+};
 
-fetch('phrases.json')
-    .then(res => res.json())
-    .then(data => phrases = data.phrases || data)
-    .catch(() => phrases = ["HOLA", "ESTOY AQUÍ"]);
+btnVisualizer.onclick = () => {
+    visualWindow = window.open('visualizer.html', 'SpiritVisualizer', 'width=500,height=600');
+};
+
+// Modal (Simplificado)
+const modal = document.getElementById("infoModal");
+document.getElementById("btnInfo").onclick = () => modal.style.display = "block";
+document.querySelector(".close").onclick = () => modal.style.display = "none";
