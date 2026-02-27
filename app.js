@@ -1,11 +1,10 @@
 /**
  * @file app.js
  * @author José A. Vázquez Mingorance
- * @date 26-02-2025
- * @description Lógica principal de la Spirit Radio LW. Gestiona el barrido aleatorio de audio,
- * el análisis de frecuencias para el visualizador y la síntesis de voz (EVP) con 
- * protocolos de seguridad anti-bloqueo.
+ * @description Lógica de Spirit Radio LW. 
+ * Ajustado: Sonidos de radio (Radio.mp3) cada 15-30 segundos aleatoriamente.
  */
+
 let running = false;
 const msgEl = document.getElementById("message");
 const btnToggle = document.getElementById("btnToggle");
@@ -16,7 +15,7 @@ const dialEl = document.getElementById("dial");
 const dialWrapper = document.querySelector(".dial-wrapper");
 
 let radioTimerId = null;
-let paranormalTimerId = null; // Usaremos esto para el timeout aleatorio
+let paranormalTimerId = null;
 let displayUpdateId = null;
 let phrases = [];
 let isSpeaking = false; 
@@ -42,19 +41,40 @@ function initAudioAnalysis() {
 async function loadPhrases() {
     try {
         const response = await fetch('phrases.json');
-        phrases = await response.json();
+        const data = await response.json();
+        phrases = data.phrases || data; // Maneja ambos formatos de JSON
     } catch (e) {
-        console.error("No se pudieron cargar las frases:", e);
+        console.error("Error cargando frases:", e);
+        phrases = ["HOLA", "ESTOY AQUÍ", "AYUDA", "CORRE"];
     }
 }
 
+// --- LÓGICA DE SONIDOS DE RADIO (CADA 15-30 SEG) ---
 function playRandomRadioSlice() {
-    if (!running) return;
-    radioBank.currentTime = Math.random() * (radioBank.duration - 2);
-    radioBank.play();
-    radioTimerId = setTimeout(playRandomRadioSlice, 2000 + Math.random() * 3000);
+    if (!running || isSpeaking) return;
+
+    // 1. Elegimos un punto aleatorio en el MP3 de radio
+    const duration = radioBank.duration || 10;
+    radioBank.currentTime = Math.random() * (duration - 1);
+    
+    // 2. Reproducimos un "trozo" corto de sonido
+    radioBank.play().then(() => {
+        // El trozo de sonido dura entre 400ms y 800ms
+        const sliceDuration = 400 + Math.random() * 400;
+        
+        setTimeout(() => {
+            radioBank.pause();
+            
+            // 3. Programamos el PRÓXIMO sonido estrictamente entre 15 y 30 segundos
+            if (running) {
+                const nextInterval = 15000 + Math.random() * 15000;
+                radioTimerId = setTimeout(playRandomRadioSlice, nextInterval);
+            }
+        }, sliceDuration);
+    }).catch(e => console.warn("Error audio radio:", e));
 }
 
+// --- LÓGICA DE EVENTOS PARANORMALES (VOZ) ---
 function triggerParanormalEvent() {
     if (!running || isSpeaking) return;
     
@@ -63,36 +83,21 @@ function triggerParanormalEvent() {
     
     const randomPhrase = phrases[Math.floor(Math.random() * phrases.length)];
     const utter = new SpeechSynthesisUtterance(randomPhrase);
-    
-    // Avisar al visualizador
-    if (visualWindow && !visualWindow.closed) {
-        visualWindow.postMessage({ type: 'AUDIO_UPDATE', volume: 80, isSpeaking: true }, '*');
-    }
+    utter.lang = 'es-ES';
+    utter.pitch = 0.5;
+    utter.rate = 0.8;
 
     utter.onstart = () => { msgEl.textContent = randomPhrase; };
     utter.onend = () => {
         isSpeaking = false;
         msgEl.classList.remove('evp-active');
-        if (visualWindow && !visualWindow.closed) {
-            visualWindow.postMessage({ type: 'AUDIO_UPDATE', volume: 20, isSpeaking: false }, '*');
-        }
     };
     
     window.speechSynthesis.speak(utter);
-}
 
-// Función recursiva para el intervalo aleatorio (15s a 30s)
-function scheduleNextParanormalEvent() {
-    if (!running) return;
-    
-    const randomDelay = Math.floor(Math.random() * (30000 - 15000 + 1)) + 15000;
-    
-    paranormalTimerId = setTimeout(() => {
-        if (running) {
-            triggerParanormalEvent();
-            scheduleNextParanormalEvent(); // Programa la siguiente ejecución
-        }
-    }, randomDelay);
+    // Reprogramar el próximo evento de voz (también aleatorio entre 15-30s)
+    const nextEventDelay = 15000 + Math.random() * 15000;
+    paranormalTimerId = setTimeout(triggerParanormalEvent, nextEventDelay);
 }
 
 function sendDataToVisualizer() {
@@ -103,23 +108,34 @@ function sendDataToVisualizer() {
     }
 }
 
+// --- CONTROLES PRINCIPALES ---
 function startRadio() {
     initAudioAnalysis();
     running = true;
     btnToggle.textContent = "Detener";
     dialEl.classList.remove('paused-anim');
+    
+    staticNoise.volume = 0.3;
     staticNoise.play();
     
+    // Actualización de pantalla y visualizador (50ms)
     displayUpdateId = setInterval(() => {
-        const dialRect = dialEl.getBoundingClientRect();
-        const wrapperRect = dialWrapper.getBoundingClientRect();
-        const percent = Math.max(0, Math.min(1, (dialRect.left - wrapperRect.left) / (wrapperRect.width - dialRect.width)));
-        msgEl.textContent = `${(153.000 + (percent * 128.000)).toFixed(3)} kHz`;
+        if (!isSpeaking) {
+            const dialRect = dialEl.getBoundingClientRect();
+            const wrapperRect = dialWrapper.getBoundingClientRect();
+            const percent = Math.max(0, Math.min(1, (dialRect.left - wrapperRect.left) / (wrapperRect.width - dialRect.width)));
+            msgEl.textContent = `${(153.000 + (percent * 128.000)).toFixed(3)} kHz`;
+        }
         sendDataToVisualizer();
     }, 50);
     
-    playRandomRadioSlice();
-    scheduleNextParanormalEvent(); // Iniciamos el ciclo aleatorio
+    // Iniciar el primer sonido de radio después de una espera inicial aleatoria
+    const initialDelay = 15000 + Math.random() * 15000;
+    radioTimerId = setTimeout(playRandomRadioSlice, initialDelay);
+
+    // Iniciar el ciclo de voces paranormales
+    const initialVoiceDelay = 15000 + Math.random() * 15000;
+    paranormalTimerId = setTimeout(triggerParanormalEvent, initialVoiceDelay);
 }
 
 function stopRadio() {
@@ -129,7 +145,7 @@ function stopRadio() {
     dialEl.classList.add('paused-anim');
     
     clearInterval(displayUpdateId);
-    clearTimeout(paranormalTimerId); // Limpiamos el timeout aleatorio
+    clearTimeout(paranormalTimerId);
     clearTimeout(radioTimerId);
     
     staticNoise.pause();
@@ -144,10 +160,16 @@ function stopRadio() {
     msgEl.classList.remove('evp-active');
 }
 
-btnToggle.onclick = () => { if (running) stopRadio(); else startRadio(); };
+btnToggle.onclick = () => { 
+    if (running) stopRadio(); else startRadio(); 
+};
 
 btnVisualizer.onclick = () => {
     visualWindow = window.open('visualizer.html', 'SpiritVisualizer', 'width=500,height=600');
 };
+
+const modal = document.getElementById("infoModal");
+document.getElementById("btnInfo").onclick = () => modal.style.display = "block";
+document.querySelector(".close").onclick = () => modal.style.display = "none";
 
 loadPhrases();
