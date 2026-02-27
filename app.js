@@ -1,12 +1,16 @@
 /**
  * @file app.js
- * @author José A. Vázquez Mingorance
- * @date 26-02-2025
- * @description Lógica principal de la Spirit Radio LW. Gestiona el barrido aleatorio de audio,
- * el análisis de frecuencias para el visualizador y la síntesis de voz (EVP) con 
- * protocolos de seguridad anti-bloqueo.
+ * @description Lógica de Spirit Radio LW optimizada para PWA y Android.
+ * - Intervalos aleatorios: 10-20 segundos.
+ * - Ruido estático: Permanente.
+ * - Funciones nativas: Vibración y Bloqueo de pantalla (WakeLock).
  */
+
 let running = false;
+let isSpeaking = false;
+let wakeLock = null;
+
+// Elementos del DOM
 const msgEl = document.getElementById("message");
 const btnToggle = document.getElementById("btnToggle");
 const btnVisualizer = document.getElementById("btnVisualizer");
@@ -15,129 +19,148 @@ const radioBank = document.getElementById("radioBank");
 const dialEl = document.getElementById("dial");
 const dialWrapper = document.querySelector(".dial-wrapper");
 
+// Timers
 let radioTimerId = null;
 let paranormalTimerId = null;
 let displayUpdateId = null;
-let phrases = [];
-let isSpeaking = false; 
 
-// --- MOTOR DE AUDIO ---
+// Datos
+let phrases = [];
 let audioCtx, analyser, dataArray;
 let visualWindow = null;
 
+/**
+ * Mantiene la pantalla encendida (Ideal para Android)
+ */
+async function requestWakeLock() {
+    if ('wakeLock' in navigator) {
+        try {
+            wakeLock = await navigator.wakeLock.request('screen');
+            console.log("Wake Lock activo: La pantalla no se apagará.");
+        } catch (err) {
+            console.warn("Wake Lock no disponible:", err);
+        }
+    }
+}
+
+/**
+ * Inicializa el análisis de audio para el visualizador
+ */
 function initAudioAnalysis() {
     if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         analyser = audioCtx.createAnalyser();
+        
         const sourceStatic = audioCtx.createMediaElementSource(staticNoise);
         const sourceRadio = audioCtx.createMediaElementSource(radioBank);
+        
         sourceStatic.connect(analyser);
         sourceRadio.connect(analyser);
         analyser.connect(audioCtx.destination);
+        
         analyser.fftSize = 256; 
         dataArray = new Uint8Array(analyser.frequencyBinCount);
     }
 }
 
+/**
+ * Envía datos de frecuencia al visualizador (ventana externa o iframe)
+ */
 function sendDataToVisualizer() {
-    if (analyser) analyser.getByteFrequencyData(dataArray);
-    if (visualWindow && !visualWindow.closed && running) {
-        let total = 0;
-        for(let i = 0; i < dataArray.length; i++) total += dataArray[i];
-        let audioVolume = (total / dataArray.length) * 2;
-        visualWindow.postMessage({ type: 'AUDIO_UPDATE', volume: audioVolume, isSpeaking: isSpeaking }, '*');
+    if (visualWindow && !visualWindow.closed && analyser) {
+        analyser.getByteFrequencyData(dataArray);
+        const avg = dataArray.reduce((a, b) => a + b) / dataArray.length;
+        visualWindow.postMessage({ 
+            type: 'AUDIO_UPDATE', 
+            volume: avg, 
+            isSpeaking: isSpeaking 
+        }, '*');
     }
 }
 
-// --- LÓGICA DE RADIO (BARRIDO) ---
+/**
+ * Reproduce trozos aleatorios de Radio.mp3 cada 10-20 segundos
+ */
 function playRandomRadioSlice() {
     if (!running || isSpeaking) return;
-    clearTimeout(radioTimerId);
 
+    // Buscar punto aleatorio en el archivo de audio
     const duration = radioBank.duration || 10;
-    radioBank.currentTime = Math.random() * duration;
-    radioBank.volume = Math.random() * 0.4 + 0.2;
+    radioBank.currentTime = Math.random() * (duration - 1);
     
+    // Reproducir un pulso corto (400ms a 800ms)
     radioBank.play().then(() => {
-        const sliceDuration = Math.random() * 400 + 200; 
-        radioTimerId = setTimeout(() => {
+        const sliceDuration = 400 + Math.random() * 400;
+        
+        setTimeout(() => {
             radioBank.pause();
-            if (running && !isSpeaking) {
-                radioTimerId = setTimeout(playRandomRadioSlice, Math.random() * 1000 + 200);
+            
+            // Programar el siguiente sonido entre 10 y 20 segundos después
+            if (running) {
+                const nextInterval = 10000 + Math.random() * 10000;
+                radioTimerId = setTimeout(playRandomRadioSlice, nextInterval);
             }
         }, sliceDuration);
-    }).catch(() => {
-        radioTimerId = setTimeout(playRandomRadioSlice, 500);
-    });
+    }).catch(e => console.warn("Error en Radio Audio:", e));
 }
 
-// --- LÓGICA DE VOZ (CON ANTI-BLOQUEO) ---
-fetch('phrases.json').then(res => res.json()).then(data => phrases = data.phrases);
-
+/**
+ * Genera un evento de voz paranormal (EVP) cada 10-20 segundos
+ */
 function triggerParanormalEvent() {
-    if (!running || phrases.length === 0 || isSpeaking) return;
-
+    if (!running || isSpeaking || phrases.length === 0) return;
+    
     isSpeaking = true;
-    clearTimeout(radioTimerId);
-    radioBank.pause();
+    
+    // Feedback táctil para Android
+    if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
 
     msgEl.classList.add('evp-active');
-    msgEl.textContent = "SINTONIZANDO...";
-
-    // Seguridad: Si en 3 segundos no ha hablado, forzar reset
-    const safetyTimeout = setTimeout(() => {
-        if (msgEl.textContent === "SINTONIZANDO...") {
-            console.log("Voz trabada, reseteando...");
-            resetAfterVoice();
-        }
-    }, 4000);
-
-    setTimeout(() => {
-        if (!running) return;
-        const text = phrases[Math.floor(Math.random() * phrases.length)];
-        
-        window.speechSynthesis.cancel(); // Limpiar cola previa
-        const utter = new SpeechSynthesisUtterance(text);
-        utter.lang = 'es-ES';
-        utter.pitch = 0.1;
-        utter.rate = 0.6;
-
-        utter.onstart = () => {
-            clearTimeout(safetyTimeout);
-            msgEl.textContent = text.toUpperCase();
-        };
-        
-        utter.onend = () => resetAfterVoice();
-        utter.onerror = () => resetAfterVoice();
-
-        window.speechSynthesis.speak(utter);
-    }, 1500);
-}
-
-function resetAfterVoice() {
-    isSpeaking = false;
-    msgEl.classList.remove('evp-active');
-    if (running) playRandomRadioSlice();
-}
-
-// --- CONTROLES ---
-function startRadio() {
-    initAudioAnalysis();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
     
-    // TRUCO: Desbloquear voz con un mensaje vacío al inicio
-    const unlock = new SpeechSynthesisUtterance("");
-    window.speechSynthesis.speak(unlock);
+    const randomPhrase = phrases[Math.floor(Math.random() * phrases.length)];
+    const utter = new SpeechSynthesisUtterance(randomPhrase);
+    
+    utter.lang = 'es-ES';
+    utter.pitch = 0.5; // Voz más grave/espectral
+    utter.rate = 0.7;
+
+    utter.onstart = () => { msgEl.textContent = randomPhrase; };
+    
+    utter.onend = () => {
+        isSpeaking = false;
+        msgEl.classList.remove('evp-active');
+        
+        // Programar la siguiente voz entre 10 y 20 segundos después
+        if (running) {
+            const nextVoiceDelay = 10000 + Math.random() * 10000;
+            paranormalTimerId = setTimeout(triggerParanormalEvent, nextVoiceDelay);
+        }
+    };
+    
+    window.speechSynthesis.speak(utter);
+}
+
+/**
+ * Inicia la radio y todos los ciclos
+ */
+async function startRadio() {
+    initAudioAnalysis();
+    if (audioCtx.state === 'suspended') await audioCtx.resume();
+    
+    await requestWakeLock(); // Android: Pantalla siempre activa
 
     running = true;
     btnToggle.textContent = "Detener";
     dialEl.classList.remove('paused-anim');
     
-    staticNoise.volume = 0.2;
+    // Ruido estático SIEMPRE activo en bucle
+    staticNoise.loop = true;
+    staticNoise.volume = 0.25; 
     staticNoise.play();
     
+    // Ciclo de actualización de pantalla (Frecuencia kHz)
     displayUpdateId = setInterval(() => {
-        if (!isSpeaking && running) {
+        if (!isSpeaking) {
             const dialRect = dialEl.getBoundingClientRect();
             const wrapperRect = dialWrapper.getBoundingClientRect();
             const percent = Math.max(0, Math.min(1, (dialRect.left - wrapperRect.left) / (wrapperRect.width - dialRect.width)));
@@ -146,38 +169,66 @@ function startRadio() {
         sendDataToVisualizer();
     }, 50);
     
-    playRandomRadioSlice();
-    paranormalTimerId = setInterval(triggerParanormalEvent, 15000); // Cada 15 seg intenta hablar
+    // Primer disparo de eventos tras un retardo aleatorio inicial (10-20s)
+    radioTimerId = setTimeout(playRandomRadioSlice, 10000 + Math.random() * 10000);
+    paranormalTimerId = setTimeout(triggerParanormalEvent, 10000 + Math.random() * 10000);
 }
 
+/**
+ * Detiene la radio y limpia los procesos
+ */
 function stopRadio() {
     running = false;
     isSpeaking = false;
     btnToggle.textContent = "Iniciar";
     dialEl.classList.add('paused-anim');
+    
+    // Liberar bloqueo de pantalla
+    if (wakeLock) {
+        wakeLock.release().then(() => wakeLock = null);
+    }
+    
     clearInterval(displayUpdateId);
-    clearInterval(paranormalTimerId);
+    clearTimeout(paranormalTimerId);
     clearTimeout(radioTimerId);
+    
     staticNoise.pause();
     radioBank.pause();
-    // Añadimos esta línea para avisar al visualizador
+    
     if (visualWindow && !visualWindow.closed) {
         visualWindow.postMessage({ type: 'STOP_ALL' }, '*');
     }
+    
     window.speechSynthesis.cancel();
     msgEl.textContent = "OFFLINE";
     msgEl.classList.remove('evp-active');
 }
 
-btnToggle.onclick = () => {
-    if (running) stopRadio(); else startRadio();
+// Eventos de usuario
+btnToggle.onclick = () => { 
+    if (running) stopRadio(); else startRadio(); 
 };
 
 btnVisualizer.onclick = () => {
     visualWindow = window.open('visualizer.html', 'SpiritVisualizer', 'width=500,height=600');
 };
 
-// Modal (Simplificado)
+// Carga inicial de frases
+fetch('phrases.json')
+    .then(res => res.json())
+    .then(data => {
+        phrases = data.phrases || data;
+    })
+    .catch(e => {
+        console.error("Error cargando frases:", e);
+        phrases = ["HOLA", "ESTOY AQUÍ", "AYUDA", "ESCUCHA"];
+    });
+
+// Cerrar modales si existen
 const modal = document.getElementById("infoModal");
-document.getElementById("btnInfo").onclick = () => modal.style.display = "block";
-document.querySelector(".close").onclick = () => modal.style.display = "none";
+const btnInfo = document.getElementById("btnInfo");
+const spanClose = document.querySelector(".close");
+
+if(btnInfo) btnInfo.onclick = () => modal.style.display = "block";
+if(spanClose) spanClose.onclick = () => modal.style.display = "none";
+window.onclick = (event) => { if (event.target == modal) modal.style.display = "none"; };
